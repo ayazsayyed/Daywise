@@ -20,6 +20,8 @@ const schema = z.object({
   GEMINI_API_KEY: z.string().optional(),
   GEMINI_MODEL: z.string().default("gemini-2.5-flash"),
   DEEPSEEK_API_KEY: z.string().optional(),
+  QWEN_API_KEY: z.string().optional(),
+  AI_TIMEOUT_MS: z.coerce.number().int().positive().optional(),
   MOCK_AI: z.enum(["0", "1"]).default("0"),
 
   GOOGLE_PLACES_API_KEY: z.string().optional(),

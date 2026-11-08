@@ -261,6 +261,16 @@ export const placesCache = pgTable("places_cache", {
   fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export type UsageMeta = {
+  provider?: string;
+  model?: string;
+  tokens_in?: number;
+  tokens_out?: number;
+  ms?: number;
+  op?: string;
+  ok?: boolean;
+};
+
 export const usageEvents = pgTable(
   "usage_events",
   {
@@ -268,9 +278,64 @@ export const usageEvents = pgTable(
     tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "set null" }),
     kind: usageKindEnum("kind").notNull(),
     costUnits: integer("cost_units").notNull().default(1),
+    meta: jsonb("meta").$type<UsageMeta>(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("usage_events_tenant_kind_idx").on(t.tenantId, t.kind, t.createdAt)],
+  (t) => [
+    index("usage_events_tenant_kind_idx").on(t.tenantId, t.kind, t.createdAt),
+    index("usage_events_kind_idx").on(t.kind, t.createdAt),
+  ],
+);
+
+/** Text Search read-through cache: normalised query → top results (30 days). */
+export const placesQueries = pgTable("places_queries", {
+  query: text("query").primaryKey(),
+  payload: jsonb("payload").$type<Record<string, unknown>[]>().notNull(),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Destination images cached in R2 (Pexels / Wikimedia), keyed by search query. */
+export const destinationImages = pgTable("destination_images", {
+  query: text("query").primaryKey(),
+  image: jsonb("image").$type<ImageRef>().notNull(),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const generationStatusEnum = pgEnum("generation_status", [
+  "queued",
+  "enhancing",
+  "drafting",
+  "verifying",
+  "photos",
+  "done",
+  "failed",
+]);
+
+export type GenerationProgress = {
+  /** Steps completed so far with their one-line result, for the progress screen. */
+  steps: { name: string; result: string; ms: number }[];
+  /** Day titles as soon as drafting completes ("Drafted so far"). */
+  days?: string[];
+  verified?: { hotels: number; hotels_total: number; stops: number; stops_total: number };
+};
+
+/** One row per generation job; the UI polls it (PNG 10). */
+export const generationJobs = pgTable(
+  "generation_jobs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    itineraryId: uuid("itinerary_id").references(() => itineraries.id, { onDelete: "set null" }),
+    prompt: text("prompt").notNull(),
+    brief: jsonb("brief").$type<Record<string, unknown>>(),
+    status: generationStatusEnum("status").notNull().default("queued"),
+    progress: jsonb("progress").$type<GenerationProgress>().notNull().default({ steps: [] }),
+    error: text("error"),
+    ...timestamps,
+  },
+  (t) => [index("generation_jobs_tenant_idx").on(t.tenantId, t.createdAt)],
 );
 
 export const auditLog = pgTable(

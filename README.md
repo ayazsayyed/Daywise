@@ -18,6 +18,15 @@ pnpm worker                                # second terminal (pg-boss)
 ```
 Without `RESEND_API_KEY` the magic link is printed in the `pnpm dev` log instead of emailed.
 
+## Generate from the CLI
+`pnpm gen "5-day Kashmir for a couple, mid-range" [--tenant sktw] [--save] [--json]` runs enhancer → generator → Places
+verification → photos in-process and prints a readable summary with verification %. `MOCK_AI=1` uses fixtures.
+The same pipeline runs as the pg-boss job `generate-itinerary` in `pnpm worker`.
+
+## Design check
+`pnpm dev`, then `SESSION_TOKEN=$(pnpm exec tsx scripts/dev/mint-session.ts) node scripts/design-shots.mjs` writes
+every screen at 1440 and 390 to `docs/design/actual/` for comparison with `docs/design/screens/` (see `docs/DESIGN.md`).
+
 ## Checks
 `pnpm check` = typecheck + lint + unit tests (must pass before every push). `pnpm e2e` runs Playwright.
 

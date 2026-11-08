@@ -1,34 +1,29 @@
 import "../../scripts/load-env";
-import { PgBoss } from "pg-boss";
 
-import { env } from "@/lib/env";
+import { getBoss, QUEUES, type GenerateJobData } from "@/lib/jobs/boss";
 import { logger as base } from "@/lib/logger";
 
+import { handleGenerate } from "./jobs/generate";
+
 /**
- * Background worker. Day 1: starts pg-boss and idles so the container is in
- * place; Day 2 registers the `generate-itinerary` handler, Day 4 the `render-pdf` one.
+ * Background worker: pg-boss queues from the same codebase, separate process.
+ * Day 2 registers `generate-itinerary`; Day 4 adds `render-pdf`.
  */
 const logger = base.child({ service: "worker" });
 
-export const QUEUES = {
-  generate: "generate-itinerary",
-  pdf: "render-pdf",
-} as const;
-
 async function main() {
-  const boss = new PgBoss({
-    connectionString: env.DATABASE_URL,
-    schema: "pgboss",
-    application_name: "daywise-worker",
-  });
+  const boss = await getBoss();
 
-  boss.on("error", (err) => logger.error({ err }, "pg-boss error"));
-
-  await boss.start();
-  for (const name of Object.values(QUEUES)) {
-    await boss.createQueue(name);
-  }
-  logger.info({ queues: Object.values(QUEUES) }, "worker started (idle — no handlers yet)");
+  await boss.work<GenerateJobData>(
+    QUEUES.generate,
+    { batchSize: 1, pollingIntervalSeconds: 1 },
+    async ([job]) => {
+      if (!job) return;
+      logger.info({ id: job.id, data: job.data }, "generate-itinerary start");
+      await handleGenerate(job.data);
+    },
+  );
+  logger.info({ queues: Object.values(QUEUES) }, "worker started");
 
   const shutdown = async (signal: string) => {
     logger.info({ signal }, "worker stopping");
