@@ -23,6 +23,7 @@ Day 1 — Skeleton live. Code complete and pushed to `main`; first deploy depend
 - `e2e/share.spec.ts` is a skipped stub until Day 4.
 
 ## Blocked / questions
+- RESOLVED by Ayaz (9 Nov): design system delivered — see `docs/DESIGN.md` and `docs/design/`. Day 2 starts with the restyle addendum in `docs/phases/day-2.md`. Tenant subdomains: keep. Branch mirror: delete `claude/*` branches, `main` only.
 - **Server prerequisites (Ayaz):** copy the filled `.env` to `~/daywise/.env` on the KVM with `POSTGRES_PASSWORD` and `ACME_EMAIL` added (new in `.env.example`), and set Actions secrets `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`. The deploy job fails fast with a clear message if `.env` is missing.
 - **SKTW brand pack missing:** `docs/reference/sktw/` is not in the repo, so the seed uses a placeholder theme colour (`#1E6FB8`) and empty contact fields. Set the real values in `/app/settings` or commit the pack and I will update the seed.
 - **letstrip.ai reference** (`docs/reference/`) not present; share-page design on Day 4 will follow CLAUDE.md's direction only unless it is added.

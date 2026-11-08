@@ -35,9 +35,10 @@ You are the sole engineer. Product decisions are already made — read `docs/PRD
 - **No new infrastructure** (Redis, queues, external auth, serverless) without a note in STATUS.md and explicit approval.
 
 ## Design direction
-- Admin UI: neutral Daywise brand — deep indigo primary (`#2E3A8C`), warm off-white surfaces, slate text, generous whitespace, Inter. Calm, fast, keyboard-friendly. Mobile-usable but desktop-first.
-- Client-facing share page and PDF: **tenant** logo and theme colour only, mobile-first, typographic hierarchy over decoration, one hero image per day, hotel card per night, clean print stylesheet. Reference: the letstrip.ai sample in `docs/reference/` if present.
-- If the `frontend-design` skill is available, use it for the share-page and editor UI work.
+- **`docs/DESIGN.md` is binding.** It holds the exact tokens, type scale, component rules, a never-do list, a screen map to `docs/design/screens/*.png`, and the agreed deviations from the PDF. Open the PNG for the screen before writing JSX and compare against it before marking a phase done.
+- Admin UI: Inter only, flat warm surfaces, hairlines, one indigo action per screen, no sidebar (56px top bar with text nav), compact tables, photos in fixed-ratio frames.
+- Client-facing share page and PDF (Day 4): **tenant** logo and theme colour only, mobile-first, same token system; designed separately and added to `docs/design/` when ready.
+- If the `frontend-design` skill is available, use it; the PNGs and DESIGN.md still win on any conflict.
 
 ## Code conventions
 - Feature folders under `src/features/<name>/` (itinerary, editor, share, tenant, auth, admin). Shared infra under `src/lib/`.
