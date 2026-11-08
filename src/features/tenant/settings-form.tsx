@@ -1,31 +1,43 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
-import { CheckCircle2, ImagePlus, Trash2 } from "lucide-react";
+import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { Upload } from "lucide-react";
 
+import { Field, SaveState, SectionLabel, TopBarAction } from "@/components/ds";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { initialsOf, THEME_PRESETS } from "@/lib/config/brand";
+import { FOOTER_MAX } from "@/lib/db/json";
 import type { TenantBranding, TenantDefaults } from "@/lib/db/schema";
+import { formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { removeLogo, saveSettings, uploadLogo, type SaveState, type UploadState } from "./actions";
+import {
+  removeLogo,
+  saveSettings,
+  uploadLogo,
+  type SaveState as Save,
+  type UploadState,
+} from "./actions";
 import { BrandPreview } from "./brand-preview";
 
 type Props = {
   tenantName: string;
   branding: TenantBranding;
   defaults: TenantDefaults;
-  customDomain: string | null;
 };
 
 const HEX = /^#([0-9a-fA-F]{6})$/;
+const FORM_ID = "agency-settings";
 
-export function SettingsForm({ tenantName, branding, defaults, customDomain }: Props) {
-  const [form, setForm] = useState({ ...branding, ...defaults });
-  const [saveState, saveAction, saving] = useActionState<SaveState, FormData>(saveSettings, {
+/** PNG 15: two-column form with section labels in the left gutter, live preview on the right. */
+export function SettingsForm({ tenantName, branding, defaults }: Props) {
+  const initial = useMemo(
+    () => ({ name: tenantName, ...branding, ...defaults }),
+    [tenantName, branding, defaults],
+  );
+  const [form, setForm] = useState(initial);
+  const [saveState, saveAction, saving] = useActionState<Save, FormData>(saveSettings, {
     status: "idle",
   });
   const [uploadState, uploadAction, uploading] = useActionState<UploadState, FormData>(uploadLogo, {
@@ -44,318 +56,398 @@ export function SettingsForm({ tenantName, branding, defaults, customDomain }: P
       setForm((f) => ({ ...f, [key]: e.target.value }));
 
   const themeValid = HEX.test(form.theme_color);
+  const themeDarkEnough = themeValid && relativeLuminance(form.theme_color) < 0.35;
   const errorField = saveState.status === "error" ? saveState.field : undefined;
+  const errorFor = (field: string) =>
+    saveState.status === "error" && errorField === field ? saveState.message : undefined;
+
+  const dirty = useMemo(() => {
+    const { logo_url: _a, ...a } = form;
+    const { logo_url: _b, ...b } = initial;
+    return JSON.stringify(a) !== JSON.stringify(b);
+  }, [form, initial]);
+
+  const saveIndicator: React.ComponentProps<typeof SaveState>["state"] = saving
+    ? "saving"
+    : saveState.status === "error" && !errorField
+      ? "failed"
+      : dirty
+        ? "unsaved"
+        : saveState.status === "saved"
+          ? "saved"
+          : "idle";
 
   return (
-    <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_380px]">
-      <div className="space-y-6">
-        {/* Logo */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Logo</CardTitle>
-            <CardDescription>
-              PNG or SVG, up to 1 MB. Shown on shared itineraries and PDFs.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form action={uploadAction} className="flex flex-wrap items-center gap-4">
-              <div className="grid h-20 w-40 place-items-center overflow-hidden rounded-lg border bg-white">
-                {form.logo_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={form.logo_url}
-                    alt={`${tenantName} logo`}
-                    className="max-h-16 max-w-36 object-contain"
-                  />
-                ) : (
-                  <span className="text-muted-foreground text-xs">No logo yet</span>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <input
-                  ref={fileRef}
-                  id="logo"
-                  name="logo"
-                  type="file"
-                  accept="image/png,image/svg+xml"
-                  className="sr-only"
-                  onChange={(e) => {
-                    if (e.target.files?.[0]) e.target.form?.requestSubmit();
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={uploading}
-                >
-                  <ImagePlus />{" "}
-                  {uploading ? "Uploading…" : form.logo_url ? "Replace logo" : "Upload logo"}
-                </Button>
-                {form.logo_url && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    disabled={uploading || removing}
-                    onClick={() => startRemove(() => removeLogo())}
-                  >
-                    <Trash2 /> {removing ? "Removing…" : "Remove"}
-                  </Button>
-                )}
-              </div>
-              {uploadState.status === "error" && (
-                <p className="text-destructive basis-full text-sm" role="alert">
-                  {uploadState.message}
-                </p>
-              )}
-              {uploadState.status === "uploaded" && (
-                <p className="text-muted-foreground basis-full text-sm" role="status">
-                  Logo uploaded.
-                </p>
-              )}
-            </form>
-          </CardContent>
-        </Card>
+    <>
+      <TopBarAction>
+        <SaveState
+          state={saveIndicator}
+          at={saveState.status === "saved" ? formatTime(saveState.at) : undefined}
+        />
+        <Button type="submit" form={FORM_ID} disabled={saving || !themeValid || !dirty}>
+          {saving ? "Saving…" : "Save changes"}
+        </Button>
+      </TopBarAction>
 
-        {/* Branding + defaults */}
-        <form action={saveAction} className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Branding</CardTitle>
-              <CardDescription>
-                Colour and contact details printed on client output.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-5 sm:grid-cols-2">
-              <Field
-                label="Theme colour"
-                htmlFor="theme_color"
-                error={errorField === "theme_color"}
-                className="sm:col-span-2"
-              >
-                <div className="flex items-center gap-3">
-                  <input
-                    type="color"
-                    aria-label="Pick theme colour"
-                    value={themeValid ? form.theme_color : "#2E3A8C"}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, theme_color: e.target.value.toUpperCase() }))
-                    }
-                    className="bg-card size-9 cursor-pointer rounded-md border p-0.5"
-                  />
-                  <Input
-                    id="theme_color"
-                    name="theme_color"
-                    value={form.theme_color}
-                    onChange={set("theme_color")}
-                    placeholder="#2E3A8C"
-                    className="max-w-40 font-mono uppercase"
-                    aria-invalid={!themeValid || undefined}
-                    spellCheck={false}
-                  />
-                  {!themeValid && (
-                    <span className="text-destructive text-xs">Use a 6-digit hex like #2E3A8C</span>
+      <div className="border-line mt-8 grid gap-16 border-t xl:grid-cols-[minmax(0,1fr)_424px]">
+        <form id={FORM_ID} action={saveAction} className="divide-line flex flex-col divide-y">
+          {/* Brand */}
+          <Section title="Brand" description="Shown at the top of the client page and the PDF.">
+            <div className="flex flex-col gap-2">
+              <SectionLabel>Logo</SectionLabel>
+              <div className="flex flex-wrap items-start gap-3">
+                <div className="border-line bg-surface-raised grid h-[78px] w-[116px] place-items-center rounded-md border">
+                  {form.logo_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={form.logo_url}
+                      alt={`${form.name} logo`}
+                      className="max-h-14 max-w-24 object-contain"
+                    />
+                  ) : (
+                    <span
+                      aria-hidden
+                      className="text-on-indigo grid size-12 place-items-center rounded-md text-[15px] font-semibold"
+                      style={{ backgroundColor: themeValid ? form.theme_color : "#2E3A8C" }}
+                    >
+                      {initialsOf(form.name, "A")}
+                    </span>
                   )}
                 </div>
-              </Field>
-              <Field label="Phone" htmlFor="phone" error={errorField === "phone"}>
+                <div className="flex flex-col gap-2 pt-1">
+                  <div className="flex items-center gap-3">
+                    <input
+                      ref={fileRef}
+                      id="logo"
+                      name="logo"
+                      type="file"
+                      accept="image/png,image/svg+xml,image/jpeg"
+                      className="sr-only"
+                      form="logo-upload"
+                      onChange={(e) => {
+                        if (e.target.files?.[0]) e.target.form?.requestSubmit();
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => fileRef.current?.click()}
+                      disabled={uploading}
+                    >
+                      <Upload aria-hidden />
+                      {uploading ? "Uploading…" : form.logo_url ? "Replace" : "Upload"}
+                    </Button>
+                    {form.logo_url && (
+                      <button
+                        type="button"
+                        disabled={uploading || removing}
+                        onClick={() => startRemove(() => removeLogo())}
+                        className="focus-ring text-body-sm text-ink-secondary hover:text-ink disabled:text-ink-muted rounded-sm"
+                      >
+                        {removing ? "Removing…" : "Remove"}
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-caption text-ink-muted">
+                    {form.logo_url ? `${fileNameOf(form.logo_url)} · ` : ""}PNG, SVG or JPG up to 2
+                    MB
+                  </p>
+                  {uploadState.status === "error" && (
+                    <p className="text-caption text-danger" role="alert">
+                      {uploadState.message}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <SectionLabel as="span" id="theme-label">
+                Theme colour
+              </SectionLabel>
+              <div className="flex flex-wrap items-center gap-3">
+                <div role="radiogroup" aria-labelledby="theme-label" className="flex gap-2">
+                  {THEME_PRESETS.map((hex) => {
+                    const active = form.theme_color.toUpperCase() === hex;
+                    return (
+                      <button
+                        key={hex}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        aria-label={hex}
+                        onClick={() => setForm((f) => ({ ...f, theme_color: hex }))}
+                        className={cn(
+                          "focus-ring border-line size-9 rounded-md border",
+                          active && "ring-ink ring-offset-surface ring-2 ring-offset-2",
+                        )}
+                        style={{ backgroundColor: hex }}
+                      />
+                    );
+                  })}
+                </div>
+                <Input
+                  id="theme_color"
+                  name="theme_color"
+                  value={form.theme_color}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, theme_color: e.target.value.toUpperCase() }))
+                  }
+                  aria-label="Theme colour hex"
+                  className="tnum w-[120px] uppercase"
+                  aria-invalid={!themeValid || undefined}
+                  spellCheck={false}
+                  maxLength={7}
+                />
+              </div>
+              <p className={cn("text-caption", themeValid ? "text-ink-muted" : "text-danger")}>
+                {!themeValid
+                  ? "Use a 6-digit hex like #2E3A8C."
+                  : !themeDarkEnough
+                    ? "This colour is light. It may be hard to read on off-white."
+                    : "Used for your name, headings and buttons on the client page. Must be dark enough to read on off-white."}
+              </p>
+            </div>
+          </Section>
+
+          {/* Contact details */}
+          <Section
+            title="Contact details"
+            description="Printed in the header and footer of every itinerary."
+          >
+            <Field label="Agency name" htmlFor="name" error={errorFor("name")}>
+              <Input id="name" name="name" value={form.name} onChange={set("name")} required />
+            </Field>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field label="Phone" htmlFor="phone" error={errorFor("phone")}>
                 <Input
                   id="phone"
                   name="phone"
                   value={form.phone}
                   onChange={set("phone")}
-                  placeholder="+91 98XXX XXXXX"
+                  placeholder="+91 22 0000 0000"
                   inputMode="tel"
                 />
               </Field>
-              <Field label="WhatsApp" htmlFor="whatsapp" error={errorField === "whatsapp"}>
+              <Field label="WhatsApp" htmlFor="whatsapp" error={errorFor("whatsapp")}>
                 <Input
                   id="whatsapp"
                   name="whatsapp"
                   value={form.whatsapp}
                   onChange={set("whatsapp")}
-                  placeholder="+91 98XXX XXXXX"
+                  placeholder="+91 98000 00000"
                   inputMode="tel"
                 />
               </Field>
-              <Field label="Email" htmlFor="email" error={errorField === "email"}>
+              <Field label="Email" htmlFor="email" error={errorFor("email")}>
                 <Input
                   id="email"
                   name="email"
                   type="email"
                   value={form.email}
                   onChange={set("email")}
-                  placeholder="hello@agency.com"
+                  placeholder="holidays@agency.com"
+                />
+              </Field>
+              <Field label="Website" htmlFor="website" error={errorFor("website")}>
+                <Input
+                  id="website"
+                  name="website"
+                  value={form.website}
+                  onChange={set("website")}
+                  placeholder="agency.com"
+                  inputMode="url"
+                />
+              </Field>
+            </div>
+            <Field label="Address" htmlFor="address" error={errorFor("address")}>
+              <Input id="address" name="address" value={form.address} onChange={set("address")} />
+            </Field>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field label="GSTIN" htmlFor="gstin" optional error={errorFor("gstin")}>
+                <Input
+                  id="gstin"
+                  name="gstin"
+                  value={form.gstin}
+                  onChange={set("gstin")}
+                  className="uppercase"
+                  spellCheck={false}
                 />
               </Field>
               <Field
-                label="Client-facing domain"
-                htmlFor="domain"
-                hint="Set up by Daywise during onboarding."
+                label="IATA or licence no."
+                htmlFor="licence_no"
+                optional
+                error={errorFor("licence_no")}
               >
                 <Input
-                  id="domain"
-                  value={customDomain ?? "planner.smallsoftware.in"}
-                  readOnly
-                  disabled
+                  id="licence_no"
+                  name="licence_no"
+                  value={form.licence_no}
+                  onChange={set("licence_no")}
+                  placeholder="Shown in the footer if added"
                 />
               </Field>
-              <Field
-                label="Address"
-                htmlFor="address"
-                error={errorField === "address"}
-                className="sm:col-span-2"
-              >
-                <Textarea
-                  id="address"
-                  name="address"
-                  value={form.address}
-                  onChange={set("address")}
-                  rows={2}
-                />
-              </Field>
-              <Field
-                label="Footer / terms line"
-                htmlFor="footer"
-                hint="One or two lines printed at the bottom of every itinerary."
-                error={errorField === "footer"}
-                className="sm:col-span-2"
-              >
-                <Textarea
-                  id="footer"
-                  name="footer"
-                  value={form.footer}
-                  onChange={set("footer")}
-                  rows={2}
-                />
-              </Field>
-            </CardContent>
-          </Card>
+            </div>
+          </Section>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Itinerary defaults</CardTitle>
-              <CardDescription>
-                Pre-filled on every new itinerary. The agent can edit them per trip.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-5 sm:grid-cols-2">
-              <Field label="Inclusions" htmlFor="inclusions" error={errorField === "inclusions"}>
-                <Textarea
-                  id="inclusions"
-                  name="inclusions"
-                  value={form.inclusions}
-                  onChange={set("inclusions")}
-                  rows={6}
-                  placeholder={"Accommodation as per itinerary\nDaily breakfast\n…"}
-                />
-              </Field>
-              <Field label="Exclusions" htmlFor="exclusions" error={errorField === "exclusions"}>
-                <Textarea
-                  id="exclusions"
-                  name="exclusions"
-                  value={form.exclusions}
-                  onChange={set("exclusions")}
-                  rows={6}
-                  placeholder={"Airfare / train tickets\nPersonal expenses\n…"}
-                />
-              </Field>
-              <Field
-                label="Payment terms"
-                htmlFor="payment_terms"
-                error={errorField === "payment_terms"}
-              >
-                <Textarea
-                  id="payment_terms"
-                  name="payment_terms"
-                  value={form.payment_terms}
-                  onChange={set("payment_terms")}
-                  rows={5}
-                />
-              </Field>
-              <Field
-                label="Cancellation policy"
-                htmlFor="cancellation"
-                error={errorField === "cancellation"}
-              >
-                <Textarea
-                  id="cancellation"
-                  name="cancellation"
-                  value={form.cancellation}
-                  onChange={set("cancellation")}
-                  rows={5}
-                />
-              </Field>
-            </CardContent>
-          </Card>
+          {/* Footer text */}
+          <Section
+            title="Footer text"
+            description="One or two lines at the end of every itinerary."
+          >
+            <Field
+              label="Footer"
+              htmlFor="footer"
+              error={errorFor("footer")}
+              hint={
+                <span className={cn("tnum", form.footer.length > FOOTER_MAX && "text-danger")}>
+                  {form.footer.length} of {FOOTER_MAX} characters
+                </span>
+              }
+            >
+              <Textarea
+                id="footer"
+                name="footer"
+                value={form.footer}
+                onChange={set("footer")}
+                rows={2}
+                maxLength={FOOTER_MAX + 20}
+              />
+            </Field>
+          </Section>
 
-          <div className="flex flex-wrap items-center gap-4">
-            <Button type="submit" disabled={saving || !themeValid}>
-              {saving ? "Saving…" : "Save settings"}
-            </Button>
-            {saveState.status === "saved" && (
-              <span
-                className="text-muted-foreground inline-flex items-center gap-1.5 text-sm"
-                role="status"
-              >
-                <CheckCircle2 className="text-primary size-4" /> Saved
-              </span>
-            )}
-            {saveState.status === "error" && (
-              <span className="text-destructive text-sm" role="alert">
-                {saveState.message}
-              </span>
-            )}
-          </div>
+          {/* Default texts */}
+          <Section
+            title="Default texts"
+            description="New itineraries start with these. Changing them does not touch itineraries you have already made."
+            last
+          >
+            <Field
+              label="Inclusions"
+              htmlFor="inclusions"
+              hint="One item per line. Shown as a list."
+              error={errorFor("inclusions")}
+            >
+              <Textarea
+                id="inclusions"
+                name="inclusions"
+                value={form.inclusions}
+                onChange={set("inclusions")}
+                rows={4}
+                placeholder={"Accommodation on twin sharing as listed\nDaily breakfast"}
+              />
+            </Field>
+            <Field label="Exclusions" htmlFor="exclusions" error={errorFor("exclusions")}>
+              <Textarea
+                id="exclusions"
+                name="exclusions"
+                value={form.exclusions}
+                onChange={set("exclusions")}
+                rows={4}
+                placeholder={"Airfare and train tickets\nAnything not listed under inclusions"}
+              />
+            </Field>
+            <Field label="Payment terms" htmlFor="payment_terms" error={errorFor("payment_terms")}>
+              <Textarea
+                id="payment_terms"
+                name="payment_terms"
+                value={form.payment_terms}
+                onChange={set("payment_terms")}
+                rows={2}
+              />
+            </Field>
+            <Field label="Cancellation" htmlFor="cancellation" error={errorFor("cancellation")}>
+              <Textarea
+                id="cancellation"
+                name="cancellation"
+                value={form.cancellation}
+                onChange={set("cancellation")}
+                rows={3}
+              />
+            </Field>
+          </Section>
+
+          {saveState.status === "error" && (
+            <p className="text-body-sm text-danger pt-6" role="alert">
+              {saveState.message}
+            </p>
+          )}
         </form>
-      </div>
 
-      <aside className="xl:sticky xl:top-10 xl:self-start">
-        <p className="text-muted-foreground mb-3 text-xs font-medium tracking-wide uppercase">
-          Live preview
-        </p>
-        <BrandPreview
-          tenantName={tenantName}
-          logoUrl={form.logo_url}
-          themeColor={themeValid ? form.theme_color : "#2E3A8C"}
-          phone={form.phone}
-          whatsapp={form.whatsapp}
-          email={form.email}
-          address={form.address}
-          footer={form.footer}
-        />
-        <Separator className="my-4" />
-        <p className="text-muted-foreground text-xs">
-          This is how your brand header and contact block will look on shared itineraries. Daywise
-          branding never appears on client output.
-        </p>
-      </aside>
-    </div>
+        {/* Separate form so choosing a file uploads without submitting the settings. */}
+        <form id="logo-upload" action={uploadAction} className="hidden" />
+
+        <aside className="xl:sticky xl:top-[88px] xl:self-start">
+          <div className="flex items-center justify-between pt-6 xl:pt-4">
+            <SectionLabel>Live preview</SectionLabel>
+            <span className="text-caption text-ink-muted">Client page header</span>
+          </div>
+          <BrandPreview
+            className="mt-3"
+            tenantName={form.name}
+            logoUrl={form.logo_url}
+            themeColor={themeValid ? form.theme_color : "#2E3A8C"}
+            phone={form.phone}
+            whatsapp={form.whatsapp}
+            email={form.email}
+            website={form.website}
+            gstin={form.gstin}
+            licenceNo={form.licence_no}
+            footer={form.footer}
+          />
+          <p className="text-caption text-ink-muted mt-3">
+            Updates as you type. The full client page is designed separately.
+          </p>
+        </aside>
+      </div>
+    </>
   );
 }
 
-function Field({
-  label,
-  htmlFor,
-  hint,
-  error,
-  className,
+function Section({
+  title,
+  description,
+  last,
   children,
 }: {
-  label: string;
-  htmlFor: string;
-  hint?: string;
-  error?: boolean;
-  className?: string;
+  title: string;
+  description: string;
+  last?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <div className={cn("space-y-2", className)}>
-      <Label htmlFor={htmlFor} className={cn(error && "text-destructive")}>
-        {label}
-      </Label>
-      {children}
-      {hint && <p className="text-muted-foreground text-xs">{hint}</p>}
-    </div>
+    <section
+      aria-label={title}
+      className={cn(
+        "grid gap-6 py-8 lg:grid-cols-[200px_minmax(0,560px)] lg:py-10",
+        last && "pb-0",
+      )}
+    >
+      <div className="flex flex-col gap-1 pr-6">
+        <h2 className="text-heading-3 text-ink">{title}</h2>
+        <p className="text-body-sm text-ink-secondary">{description}</p>
+      </div>
+      <div className="flex flex-col gap-6">{children}</div>
+    </section>
   );
+}
+
+function fileNameOf(url: string): string {
+  try {
+    return decodeURIComponent(new URL(url).pathname.split("/").pop() ?? "");
+  } catch {
+    return "";
+  }
+}
+
+/** WCAG relative luminance of a #RRGGBB colour (0 = black, 1 = white). */
+export function relativeLuminance(hex: string): number {
+  const n = parseInt(hex.slice(1), 16);
+  const chan = (v: number) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * chan((n >> 16) & 255) + 0.7152 * chan((n >> 8) & 255) + 0.0722 * chan(n & 255);
 }

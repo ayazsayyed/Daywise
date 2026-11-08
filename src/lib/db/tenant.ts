@@ -63,6 +63,17 @@ export function tenantScope(tenantId: string, conn: Db = db) {
       return row;
     },
 
+    async updateName(name: string) {
+      const clean = z.string().trim().min(2).max(80).parse(name);
+      const [row] = await conn
+        .update(schema.tenants)
+        .set({ name: clean, updatedAt: new Date() })
+        .where(eq(schema.tenants.id, id))
+        .returning();
+      if (!row) throw new TenantIsolationError("Tenant not found");
+      return row;
+    },
+
     async updateBranding(input: unknown) {
       const branding = tenantBrandingSchema.parse(input);
       const [row] = await conn

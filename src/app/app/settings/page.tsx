@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { PageHeader } from "@/components/app/page-header";
+import { Page, PageTitle } from "@/components/ds";
 import { requireTenant } from "@/lib/auth/guards";
 import { SettingsForm } from "@/features/tenant/settings-form";
 
@@ -11,17 +11,17 @@ export default async function SettingsPage() {
   const { tenant } = session;
 
   return (
-    <>
-      <PageHeader
+    <Page>
+      <PageTitle
         title="Agency settings"
-        description="Branding and default text that appear on every client-facing itinerary and PDF."
+        subtitle="How your agency appears on every itinerary you share, and the text new itineraries start with."
       />
       <SettingsForm
+        key={tenant.updatedAt.toISOString()}
         tenantName={tenant.name}
         branding={tenant.branding}
         defaults={tenant.defaults}
-        customDomain={tenant.customDomain}
       />
-    </>
+    </Page>
   );
 }

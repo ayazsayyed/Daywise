@@ -30,6 +30,7 @@ const schema = z.object({
 
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().default("Daywise <login@smallsoftware.in>"),
+  SUPPORT_EMAIL: z.string().email().default("support@smallsoftware.in"),
 
   R2_ACCOUNT_ID: z.string().optional(),
   R2_ACCESS_KEY_ID: z.string().optional(),

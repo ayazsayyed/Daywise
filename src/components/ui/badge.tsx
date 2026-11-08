@@ -3,15 +3,18 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
+/** Tinted ground, radius-sm, never a pill. Colour is never the only signal. */
 const badgeVariants = cva(
-  "inline-flex items-center justify-center rounded-md border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 gap-1 [&>svg]:size-3 [&>svg]:pointer-events-none",
+  "inline-flex w-fit shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-sm px-2 py-0.5 text-body-sm font-medium [&>svg]:pointer-events-none [&>svg]:size-3",
   {
     variants: {
       variant: {
-        default: "border-transparent bg-primary text-primary-foreground",
-        secondary: "border-transparent bg-secondary text-secondary-foreground",
-        destructive: "border-transparent bg-destructive text-destructive-foreground",
-        outline: "text-foreground",
+        default: "bg-surface-sunken text-ink-secondary",
+        secondary: "bg-surface-sunken text-ink-secondary",
+        verified: "bg-green-soft text-green",
+        verify: "bg-amber-soft text-amber",
+        destructive: "bg-danger/10 text-danger",
+        outline: "border border-line text-ink-secondary",
       },
     },
     defaultVariants: { variant: "default" },

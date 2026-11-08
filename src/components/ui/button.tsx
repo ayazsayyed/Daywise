@@ -4,24 +4,32 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * shadcn button with Daywise tokens: 40px tall, 14px/600, radius-md.
+ * Variants per DESIGN.md — primary (indigo), secondary (raised + line-strong),
+ * quiet (text + icon), destructive (danger outline). One primary per screen.
+ */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+  "focus-ring inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md text-button transition-colors disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90",
-        destructive: "bg-destructive text-destructive-foreground shadow-xs hover:bg-destructive/90",
+        default:
+          "bg-indigo text-on-indigo hover:bg-indigo-hover active:bg-indigo-hover disabled:bg-indigo/45",
+        secondary:
+          "border border-line-strong bg-surface-raised text-ink hover:bg-surface-sunken disabled:border-line disabled:text-ink-muted/60",
         outline:
-          "border border-border bg-card shadow-xs hover:bg-accent hover:text-accent-foreground",
-        secondary: "bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+          "border border-line-strong bg-surface-raised text-ink hover:bg-surface-sunken disabled:border-line disabled:text-ink-muted/60",
+        ghost: "text-ink hover:bg-surface-sunken disabled:text-ink-muted/60",
+        destructive:
+          "border border-danger bg-transparent text-danger hover:bg-danger/5 disabled:border-danger/40 disabled:text-danger/40",
+        link: "h-auto rounded-none px-0 font-medium text-indigo underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-9 px-4 py-2 has-[>svg]:px-3",
-        sm: "h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5",
-        lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
-        icon: "size-9",
+        default: "h-10 px-4",
+        sm: "h-8 px-3 text-body-sm font-medium",
+        lg: "h-12 px-5 text-[15px]",
+        icon: "size-10",
       },
     },
     defaultVariants: { variant: "default", size: "default" },

@@ -14,7 +14,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 // ── Enums ────────────────────────────────────────────────────────────────
-export const tenantStatusEnum = pgEnum("tenant_status", ["active", "suspended"]);
+export const tenantStatusEnum = pgEnum("tenant_status", ["trial", "active", "suspended"]);
 export const userRoleEnum = pgEnum("user_role", ["admin", "superadmin"]);
 export const itineraryStatusEnum = pgEnum("itinerary_status", [
   "draft",
@@ -32,7 +32,11 @@ export type TenantBranding = {
   phone: string;
   whatsapp: string;
   email: string;
+  website: string;
   address: string;
+  /** Printed in the client footer when present (DESIGN.md deviation 6). */
+  gstin: string;
+  licence_no: string;
   footer: string;
 };
 
@@ -57,6 +61,9 @@ export type ItineraryClient = {
   name: string;
   phone?: string;
   email?: string;
+  /** DESIGN.md deviation 7. */
+  city?: string;
+  referred_by?: string;
   pax: { adults: number; children: number; child_ages: number[] };
 };
 
@@ -91,7 +98,9 @@ export const tenants = pgTable("tenants", {
   status: tenantStatusEnum("status").notNull().default("active"),
   suspendedAt: timestamp("suspended_at", { withTimezone: true }),
   plan: text("plan").notNull().default("standard"),
+  /** Shown in admin as "AI calls / month" (DESIGN.md deviation 4). */
   dailyGenCap: integer("daily_gen_cap").notNull().default(50),
+  monthlyPdfCap: integer("monthly_pdf_cap").notNull().default(200),
   branding: jsonb("branding").$type<TenantBranding>().notNull(),
   defaults: jsonb("defaults").$type<TenantDefaults>().notNull(),
   ...timestamps,

@@ -1,4 +1,6 @@
-import { Mail, MapPin, MessageCircle, Phone } from "lucide-react";
+import { PhotoFrame, SectionLabel } from "@/components/ds";
+import { initialsOf } from "@/lib/config/brand";
+import { cn } from "@/lib/utils";
 
 type Props = {
   tenantName: string;
@@ -7,11 +9,17 @@ type Props = {
   phone: string;
   whatsapp: string;
   email: string;
-  address: string;
+  website: string;
+  gstin: string;
+  licenceNo: string;
   footer: string;
+  className?: string;
 };
 
-/** Client-facing header + contact card, rendered with the tenant's own brand only. */
+/**
+ * PNG 15 "Client page header": tenant logo and theme colour only, never
+ * Daywise branding. Sample trip copy is fixed; contact lines come from the form.
+ */
 export function BrandPreview({
   tenantName,
   logoUrl,
@@ -19,81 +27,67 @@ export function BrandPreview({
   phone,
   whatsapp,
   email,
-  address,
+  website,
+  gstin,
+  licenceNo,
   footer,
+  className,
 }: Props) {
+  const name = tenantName.trim() || "Your agency";
+  const contact = [phone, email, website].filter(Boolean).join(" · ");
+  const registration = [gstin && `GSTIN ${gstin}`, licenceNo && `Licence ${licenceNo}`]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
-    <div className="overflow-hidden rounded-xl border bg-white text-[#1f2430] shadow-xs">
-      <div className="h-1.5" style={{ backgroundColor: themeColor }} />
-      <div className="flex items-center gap-3 px-5 py-4">
+    <div
+      className={cn(
+        "border-line bg-surface-raised text-ink overflow-hidden rounded-lg border",
+        className,
+      )}
+      aria-label="Client page header preview"
+    >
+      <div className="flex items-center gap-3 px-4 py-3">
         {logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={logoUrl} alt="" className="h-9 max-w-32 object-contain" />
+          <img src={logoUrl} alt="" className="h-7 max-w-28 object-contain" />
         ) : (
           <span
-            className="grid size-9 place-items-center rounded-md text-sm font-bold text-white"
+            className="text-on-indigo grid size-7 shrink-0 place-items-center rounded-sm text-[11px] font-semibold"
             style={{ backgroundColor: themeColor }}
             aria-hidden
           >
-            {tenantName.trim().charAt(0).toUpperCase() || "A"}
+            {initialsOf(name, "A")}
           </span>
         )}
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">{tenantName}</p>
-          <p className="text-xs text-neutral-500">Your 5-day Kashmir itinerary</p>
+        <span className="text-body-sm min-w-0 flex-1 truncate font-semibold">{name}</span>
+        <span
+          className="text-caption text-on-indigo shrink-0 rounded-sm px-2.5 py-1 font-semibold"
+          style={{ backgroundColor: themeColor }}
+          aria-hidden={!whatsapp}
+        >
+          WhatsApp us
+        </span>
+      </div>
+      <div className="bg-line h-px" />
+
+      <div className="flex flex-col gap-4 px-4 pt-4 pb-5">
+        <PhotoFrame ratio="3:2" index={0} alt="" caption="Dal Lake, Srinagar" />
+        <div className="flex flex-col gap-1">
+          <SectionLabel style={{ color: themeColor }}>Prepared for Ananya &amp; Rohit</SectionLabel>
+          <p className="text-heading-2">Kashmir, five days</p>
+          <p className="text-body-sm text-ink-secondary">
+            14–18 Mar 2027 · 4 nights · Srinagar, Gulmarg, Pahalgam
+          </p>
         </div>
       </div>
+      <div className="bg-line h-px" />
 
-      <div
-        className="mx-5 h-28 rounded-lg bg-[linear-gradient(135deg,#e9edf5,#f6f1e7)]"
-        aria-hidden
-      />
-
-      <div className="space-y-2 px-5 py-4">
-        <div className="h-2.5 w-2/3 rounded bg-neutral-200" aria-hidden />
-        <div className="h-2.5 w-1/2 rounded bg-neutral-200" aria-hidden />
-        <div className="h-2.5 w-3/5 rounded bg-neutral-200" aria-hidden />
-      </div>
-
-      <div
-        className="mx-5 mb-4 rounded-lg border p-4 text-sm"
-        style={{ borderColor: `${themeColor}33` }}
-      >
-        <p
-          className="mb-2 text-xs font-semibold tracking-wide uppercase"
-          style={{ color: themeColor }}
-        >
-          Contact {tenantName}
-        </p>
-        <ul className="space-y-1.5 text-[13px] text-neutral-700">
-          <li className="flex items-center gap-2">
-            <Phone className="size-3.5 shrink-0" style={{ color: themeColor }} />{" "}
-            {phone || <Placeholder>Phone</Placeholder>}
-          </li>
-          <li className="flex items-center gap-2">
-            <MessageCircle className="size-3.5 shrink-0" style={{ color: themeColor }} />{" "}
-            {whatsapp || <Placeholder>WhatsApp</Placeholder>}
-          </li>
-          <li className="flex items-center gap-2">
-            <Mail className="size-3.5 shrink-0" style={{ color: themeColor }} />{" "}
-            {email || <Placeholder>Email</Placeholder>}
-          </li>
-          <li className="flex items-start gap-2">
-            <MapPin className="mt-0.5 size-3.5 shrink-0" style={{ color: themeColor }} />
-            <span className="whitespace-pre-line">
-              {address || <Placeholder>Address</Placeholder>}
-            </span>
-          </li>
-        </ul>
-      </div>
-
-      <div className="border-t px-5 py-3 text-[11px] leading-relaxed whitespace-pre-line text-neutral-500">
-        {footer || <Placeholder>Footer / terms line</Placeholder>}
+      <div className="text-caption text-ink-muted flex flex-col gap-1 px-4 py-3">
+        <p className="truncate">{contact || "Phone · email · website appear here"}</p>
+        {registration && <p className="truncate">{registration}</p>}
+        <p className="line-clamp-3">{footer || "Your footer text appears here."}</p>
       </div>
     </div>
   );
-}
-
-function Placeholder({ children }: { children: React.ReactNode }) {
-  return <span className="text-neutral-400 italic">{children}</span>;
 }
