@@ -1,0 +1,15 @@
+# Local development: only Postgres. `docker compose -f docker-compose.dev.yml up -d`
+name: daywise-dev
+services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: daywise
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: daywise
+    volumes:
+      - pgdata_dev:/var/lib/postgresql/data
+volumes:
+  pgdata_dev:

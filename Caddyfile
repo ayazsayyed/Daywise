@@ -1,0 +1,28 @@
+# Daywise edge. On-demand TLS: Caddy asks the app whether a hostname is a known
+# tenant domain (or planner.smallsoftware.in) before requesting a certificate.
+{
+	email {$ACME_EMAIL}
+	on_demand_tls {
+		ask http://app:3000/api/tls-check
+	}
+}
+
+https:// {
+	tls {
+		on_demand
+	}
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+	reverse_proxy app:3000 {
+		header_up X-Forwarded-Host {host}
+	}
+}
+
+http:// {
+	redir https://{host}{uri} permanent
+}

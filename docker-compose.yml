@@ -1,0 +1,72 @@
+# Production stack on the KVM: caddy → app (Next) ; worker (pg-boss) ; postgres 16.
+# `.env` (runtime secrets) lives next to this file on the server. IMAGE_TAG is set by CI.
+
+name: daywise
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: daywise
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: daywise
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U daywise -d daywise"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  migrate:
+    image: ghcr.io/ayazsayyed/daywise-worker:${IMAGE_TAG:-latest}
+    command: ["pnpm", "db:migrate"]
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    image: ghcr.io/ayazsayyed/daywise:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DAYWISE_SERVICE: app
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    expose:
+      - "3000"
+
+  worker:
+    image: ghcr.io/ayazsayyed/daywise-worker:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DAYWISE_SERVICE: worker
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
