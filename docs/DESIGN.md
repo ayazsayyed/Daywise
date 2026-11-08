@@ -98,3 +98,61 @@ No sidebar, stat cards, icons in coloured circles, dashed empty states, illustra
 - Build a small `src/components/ds/` layer on top of shadcn: `StatusDot`, `Badge` variants, `PhotoFrame` (ratio + ground rotation + caption), `SectionLabel`, `TopBar`, `Sheet` wrapper with shadow-float, `SegmentedControl`.
 - Load Inter via `next/font` with weights 400/500/600 and `font-feature-settings: "tnum"` on numeric elements.
 - Every screen must be checked against its PNG at 1440 and, where a mobile PNG exists, at 390 before the phase is marked done.
+
+---
+
+# Part 2 — Client itinerary page and PDF (binding)
+
+Source: `docs/design/Daywise_client.pdf`, `docs/design/Daywise_pdf.pdf`, PNGs 20–37 in `docs/design/screens/`. Same discipline as the admin system, wearing the agency's colour. Daywise is never named on these surfaces.
+
+## Tenant colour
+- One `tenant-accent` per agency (hex from Settings). Must reach ≥ 4.5:1 against `surface` (#F7F5F1); Settings validates and offers a darkened version if it fails (e.g. saffron → #9A4A0B). `on-tenant-accent` is #F7F5F1.
+- May touch: agency wordmark and logo tile; one 1px `tenant-rule` under the header and one above the footer; day numbers and the current day in the index; the WhatsApp button (the only filled shape); links in the contact block.
+- Never: backgrounds, bands, cards or section fills; over or tinting a photo; headings, body, prices or times; two filled buttons on one screen; a second colour or gradient.
+
+## New tokens
+| Token | Value | Use |
+|---|---|---|
+| paper | #F7F5F1 screen · #FFFFFF print | Page ground |
+| reading-column | 720px | Desktop text and day column |
+| photo-column | 880px | Desktop hero photos may run wider than text |
+| gutter-mobile | 20px | Side gutter at 390 (admin uses 16) |
+| bar-height | 64px + safe-area | Sticky bottom bar on mobile |
+| index-height | 44px | Sticky day index |
+| section-gap | 64px mobile · 96px desktop | Between days and major sections |
+| print-margin | 15mm (57px @96dpi) | All A4 edges |
+| print-body | 10.5pt | Stop lines, terms |
+| print-caption | 9pt | Footer, credits, captions; nothing smaller |
+| print-photo | hero 1200×800 q72 · hotel 800×600 q70 | JPEG re-encode targets |
+
+## Type (client page; larger and looser than admin)
+Trip title 34/38 mobile · 52/56 desktop · 600 · -0.026em. Day title 22/28 · 28/34 · 600. Hotel name 18/24 · 600. Stop: time 13 tabular ink-muted, title 15/20 600, line 15/25 400. Price 32/36 · 600 · tabular. Day number: tenant-accent, 600, same size as the eyebrow line it sits beside.
+
+## Structure (PNG 23 mobile, 29–34 desktop)
+1. **Header**: logo tile + agency name (tenant-accent), optional tagline (new field), "Call" on mobile / phone + WhatsApp button on desktop; `tenant-rule` below.
+2. **Cover**: eyebrow "PREPARED FOR …", trip title, "14 to 18 Mar 2027 · 4 nights · 2 adults", hero 3:2 with caption **under the frame only** (see deviation 1), WhatsApp primary button with the contact person's name and number beneath (mobile), trip summary paragraph, route line.
+3. **Day index**: mobile — 44px sticky bar "Day 3 · Pahalgam ˅  1 2 3 4 5", tap opens the Overview bottom sheet (PNG 25: day, place, night + hotel, plus "Price, inclusions and terms" and "Contact …"); desktop — left column list "Your five days" that stays sticky.
+4. **Days**: day number (accent) + "DAY n · DOW DD MON" eyebrow, title, hero, caption under, transport line with icon, stops (time left, title + one line), hotel card (4:3 photo, NIGHT n eyebrow, name, area, hairline, Room / Meals / Check-in rows with meal plan spelled out + code in brackets). Last day: "Departure day · no hotel" line. Missing hotel photo: sunken frame with a small bed icon and the place name.
+5. **Price** (modes per PNG 21): Total; Per person with "2 × ₹42,250 = ₹84,500" breakdown; Adult and child rows + total. Optional tax note line under total. Hidden mode removes the section, its index entry and its rule; sticky bar says "Ask for price · Quoted on WhatsApp".
+6. **Included / Not included** two columns (stacked on mobile), **Payment** and **Cancellation** short paragraphs.
+7. **Footer**: `tenant-rule`, logo + agency name, footer note, contact table (WhatsApp, Phone, Email, Office, Website, GSTIN, Licence when present; links in accent), then two caption lines: "Hotels are subject to availability at the time of booking · Last updated DD MMM YYYY" and the photo credit line (see deviation 2).
+8. **Sticky bottom bar (mobile)**: price + mode line on the left ("₹42,250 · per person · 2 adults") or "Ask for price", WhatsApp button right. Hidden while the Overview sheet is open.
+9. **States** (PNG 27, 28): disabled — "This itinerary is no longer available", explanation, "Ask on WhatsApp", contact table; unavailable — "Your itinerary can't be shown right now", "Try again" secondary, phone number. Both carry the agency header, never Daywise.
+
+## PDF (PNG 35–37; `Daywise_pdf.pdf`)
+- A4 portrait, 15 mm margins, white paper, ink #1C1B19, secondary #5E5B55. Body 10.5pt, captions 9pt minimum.
+- Page 1 cover: header row (logo + agency, "Itinerary · DD MMM YYYY"), eyebrow, trip title, meta, hero, summary + route, **"Where you stay"** night list, contact strip at the foot ("Questions or changes: <contact person>", WhatsApp, phone, email, website).
+- Then one day per page (break before each day); hotel cards and stop rows never split (`break-inside: avoid`). Long days may flow to a second page but the hotel card moves whole.
+- Final page: "Price and terms" (price block, included/not included, payment, cancellation), footer block with logo, note, full contact table, the two caption lines.
+- Running footer on every page after the cover: "<Agency> · <Trip title for client>" left, "Page n of N" right, 1px rule above.
+- No buttons, no links styled as buttons; phone numbers printed in full. Tenant colour only on wordmark, cover rule, day numbers.
+- Photos re-encoded to print-photo targets through the proxy; a 5-day PDF lands around 1.6 MB.
+
+## Agreed deviations from the client PDFs
+1. **Photo captions appear once, under the frame.** The mockups show the caption both inside and under the photo; that is a rendering duplicate. Client page and PDF: caption under only. (Admin keeps caption inside the frame.)
+2. **Photo credit line must satisfy Google's attribution terms.** Render "Photos: Google Maps contributors · <authorAttributions displayName, comma-separated>" rather than listing hotel names. Pexels photos add "· <photographer> / Pexels". Keep it at print-caption size.
+3. **Tax note is free text**, as in Part 1 ("Includes 5% GST. Airfare not included." is just the agent's note).
+4. **New tenant fields**: `tagline` (optional, under agency name), `contact_person` (optional, used in "Questions or changes" and under the WhatsApp button).
+5. **Contrast guard** on theme colour in Settings (≥ 4.5:1 on #F7F5F1) with a one-click darkened suggestion; the PDF uses the same stored colour.
+6. **Desktop day index** is sticky but never covers content below 1100px wide; between 768 and 1100 it collapses to the mobile 44px bar.
+7. **View tracking** counts a page open once per hour per device; opening the Overview sheet or scrolling is not tracked.

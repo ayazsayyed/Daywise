@@ -29,6 +29,6 @@ Design arrived after Day 1. Before touching the pipeline:
 2. Replace hand-written primitives with shadcn CLI components; move tokens into `globals.css` `@theme` per DESIGN.md; add `src/components/ds/` (`TopBar`, `StatusDot`, `Badge`, `PhotoFrame`, `SectionLabel`, `SegmentedControl`).
 3. Remove the sidebar; implement the 56px top bar.
 4. Restyle `/login` (split hero layout, link-sent state with resend countdown), `/app` empty state (PNG 07), `/app/settings` (PNG 15, incl. new fields `website`, `gstin`, `licence_no`, colour presets, live header preview), `/admin` placeholder to PNG 16's table shell.
-5. Add schema fields from DESIGN.md deviations 4, 6, 7 in one migration (`monthly_pdf_cap`, tenant `status` enum gains `trial`, branding `website/gstin/licence_no`, client `referred_by/city`).
+5. Add schema fields from DESIGN.md Part 1 deviations 4, 6, 7 and Part 2 deviation 4 (`tagline`, `contact_person`) in one migration (`monthly_pdf_cap`, tenant `status` enum gains `trial`, branding `website/gstin/licence_no`, client `referred_by/city`).
 6. Screenshot each restyled screen at 1440 and 390 with Playwright into `docs/design/actual/` and note any intentional differences in STATUS.md.
 Accept: the four existing screens are visually faithful to their PNGs; `pnpm check` green. Then continue with the Day 2 pipeline scope above.
