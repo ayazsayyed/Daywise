@@ -24,7 +24,7 @@ export const THEME_PRESETS = [
   "#2E3A8C",
   "#1F6B4A",
   "#7B2D5E",
-  "#9A6A1F",
+  "#8A5A12",
   "#3B3A37",
 ] as const;
 

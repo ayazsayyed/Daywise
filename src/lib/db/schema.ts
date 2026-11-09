@@ -37,6 +37,10 @@ export type TenantBranding = {
   /** Printed in the client footer when present (DESIGN.md deviation 6). */
   gstin: string;
   licence_no: string;
+  /** Part 2 deviation 4: optional line under the agency name on the client page. */
+  tagline: string;
+  /** Part 2 deviation 4: "Questions or changes: <contact_person>" on client page and PDF. */
+  contact_person: string;
   footer: string;
 };
 

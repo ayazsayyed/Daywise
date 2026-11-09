@@ -12,6 +12,8 @@ type Props = {
   website: string;
   gstin: string;
   licenceNo: string;
+  tagline: string;
+  contactPerson: string;
   footer: string;
   className?: string;
 };
@@ -30,11 +32,15 @@ export function BrandPreview({
   website,
   gstin,
   licenceNo,
+  tagline,
+  contactPerson,
   footer,
   className,
 }: Props) {
   const name = tenantName.trim() || "Your agency";
-  const contact = [phone, email, website].filter(Boolean).join(" · ");
+  const contact = [contactPerson && `Questions or changes: ${contactPerson}`, phone, email, website]
+    .filter(Boolean)
+    .join(" · ");
   const registration = [gstin && `GSTIN ${gstin}`, licenceNo && `Licence ${licenceNo}`]
     .filter(Boolean)
     .join(" · ");
@@ -60,7 +66,10 @@ export function BrandPreview({
             {initialsOf(name, "A")}
           </span>
         )}
-        <span className="text-body-sm min-w-0 flex-1 truncate font-semibold">{name}</span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="text-body-sm truncate font-semibold">{name}</span>
+          {tagline && <span className="text-caption text-ink-muted truncate">{tagline}</span>}
+        </span>
         <span
           className="text-caption text-on-indigo shrink-0 rounded-sm px-2.5 py-1 font-semibold"
           style={{ backgroundColor: themeColor }}

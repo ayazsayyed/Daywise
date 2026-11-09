@@ -7,6 +7,7 @@ import { Field, SaveState, SectionLabel, TopBarAction } from "@/components/ds";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { contrastRatio, darkenToReadable, readableOnSurface, SURFACE_HEX } from "@/lib/color";
 import { initialsOf, THEME_PRESETS } from "@/lib/config/brand";
 import { FOOTER_MAX } from "@/lib/db/json";
 import type { TenantBranding, TenantDefaults } from "@/lib/db/schema";
@@ -56,7 +57,8 @@ export function SettingsForm({ tenantName, branding, defaults }: Props) {
       setForm((f) => ({ ...f, [key]: e.target.value }));
 
   const themeValid = HEX.test(form.theme_color);
-  const themeDarkEnough = themeValid && relativeLuminance(form.theme_color) < 0.35;
+  const themeReadable = themeValid && readableOnSurface(form.theme_color);
+  const themeFix = themeValid && !themeReadable ? darkenToReadable(form.theme_color) : null;
   const errorField = saveState.status === "error" ? saveState.field : undefined;
   const errorFor = (field: string) =>
     saveState.status === "error" && errorField === field ? saveState.message : undefined;
@@ -84,7 +86,7 @@ export function SettingsForm({ tenantName, branding, defaults }: Props) {
           state={saveIndicator}
           at={saveState.status === "saved" ? formatTime(saveState.at) : undefined}
         />
-        <Button type="submit" form={FORM_ID} disabled={saving || !themeValid || !dirty}>
+        <Button type="submit" form={FORM_ID} disabled={saving || !themeReadable || !dirty}>
           {saving ? "Saving…" : "Save changes"}
         </Button>
       </TopBarAction>
@@ -201,13 +203,26 @@ export function SettingsForm({ tenantName, branding, defaults }: Props) {
                   maxLength={7}
                 />
               </div>
-              <p className={cn("text-caption", themeValid ? "text-ink-muted" : "text-danger")}>
-                {!themeValid
-                  ? "Use a 6-digit hex like #2E3A8C."
-                  : !themeDarkEnough
-                    ? "This colour is light. It may be hard to read on off-white."
-                    : "Used for your name, headings and buttons on the client page. Must be dark enough to read on off-white."}
-              </p>
+              {!themeValid ? (
+                <p className="text-caption text-danger">Use a 6-digit hex like #2E3A8C.</p>
+              ) : themeFix ? (
+                <p className="text-caption text-danger">
+                  Too light to read on off-white (
+                  {contrastRatio(form.theme_color, SURFACE_HEX).toFixed(1)}:1, needs 4.5:1).{" "}
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, theme_color: themeFix }))}
+                    className="focus-ring text-ink rounded-sm font-medium underline underline-offset-4"
+                  >
+                    Use {themeFix}
+                  </button>
+                </p>
+              ) : (
+                <p className="text-caption text-ink-muted">
+                  Used for your name, headings and buttons on the client page. Must be dark enough
+                  to read on off-white.
+                </p>
+              )}
             </div>
           </Section>
 
@@ -219,6 +234,40 @@ export function SettingsForm({ tenantName, branding, defaults }: Props) {
             <Field label="Agency name" htmlFor="name" error={errorFor("name")}>
               <Input id="name" name="name" value={form.name} onChange={set("name")} required />
             </Field>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field
+                label="Tagline"
+                htmlFor="tagline"
+                optional
+                hint="One short line under your name on the client page."
+                error={errorFor("tagline")}
+              >
+                <Input
+                  id="tagline"
+                  name="tagline"
+                  value={form.tagline}
+                  onChange={set("tagline")}
+                  placeholder="Holidays planned personally since 1998"
+                  maxLength={80}
+                />
+              </Field>
+              <Field
+                label="Contact person"
+                htmlFor="contact_person"
+                optional
+                hint="Named under the WhatsApp button and in the PDF."
+                error={errorFor("contact_person")}
+              >
+                <Input
+                  id="contact_person"
+                  name="contact_person"
+                  value={form.contact_person}
+                  onChange={set("contact_person")}
+                  placeholder="Nikhil Joshi"
+                  maxLength={80}
+                />
+              </Field>
+            </div>
             <div className="grid gap-5 sm:grid-cols-2">
               <Field label="Phone" htmlFor="phone" error={errorFor("phone")}>
                 <Input
@@ -395,6 +444,8 @@ export function SettingsForm({ tenantName, branding, defaults }: Props) {
             website={form.website}
             gstin={form.gstin}
             licenceNo={form.licence_no}
+            tagline={form.tagline}
+            contactPerson={form.contact_person}
             footer={form.footer}
           />
           <p className="text-caption text-ink-muted mt-3">
@@ -440,14 +491,4 @@ function fileNameOf(url: string): string {
   } catch {
     return "";
   }
-}
-
-/** WCAG relative luminance of a #RRGGBB colour (0 = black, 1 = white). */
-export function relativeLuminance(hex: string): number {
-  const n = parseInt(hex.slice(1), 16);
-  const chan = (v: number) => {
-    const c = v / 255;
-    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-  };
-  return 0.2126 * chan((n >> 16) & 255) + 0.7152 * chan((n >> 8) & 255) + 0.0722 * chan(n & 255);
 }

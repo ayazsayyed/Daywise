@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireTenant } from "@/lib/auth/guards";
+import { darkenToReadable, isHex, readableOnSurface } from "@/lib/color";
 import { tenantBrandingSchema, tenantDefaultsSchema } from "@/lib/db/json";
 import { tenantScope } from "@/lib/db/tenant";
 import { logger } from "@/lib/logger";
@@ -24,6 +25,8 @@ const settingsFormSchema = z.object({
   address: z.string().trim(),
   gstin: z.string().trim(),
   licence_no: z.string().trim(),
+  tagline: z.string().trim(),
+  contact_person: z.string().trim(),
   footer: z.string().trim(),
   inclusions: z.string(),
   exclusions: z.string(),
@@ -46,6 +49,15 @@ export async function saveSettings(_prev: SaveState, formData: FormData): Promis
   }
   const f = raw.data;
 
+  // DESIGN.md Part 2 deviation 5: the theme colour must read on off-white.
+  if (isHex(f.theme_color) && !readableOnSurface(f.theme_color)) {
+    return {
+      status: "error",
+      message: `That colour is too light to read on off-white. Try ${darkenToReadable(f.theme_color)}.`,
+      field: "theme_color",
+    };
+  }
+
   const branding = tenantBrandingSchema.safeParse({
     logo_url: session.tenant.branding.logo_url,
     theme_color: f.theme_color.toUpperCase(),
@@ -56,6 +68,8 @@ export async function saveSettings(_prev: SaveState, formData: FormData): Promis
     address: f.address,
     gstin: f.gstin.toUpperCase(),
     licence_no: f.licence_no,
+    tagline: f.tagline,
+    contact_person: f.contact_person,
     footer: f.footer,
   });
   if (!branding.success) {

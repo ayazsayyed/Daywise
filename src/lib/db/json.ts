@@ -26,6 +26,8 @@ export const tenantBrandingSchema = z.object({
   address: z.string().max(500),
   gstin: z.string().trim().max(20).default(""),
   licence_no: z.string().trim().max(60).default(""),
+  tagline: z.string().trim().max(80).default(""),
+  contact_person: z.string().trim().max(80).default(""),
   footer: z.string().max(FOOTER_MAX, `Keep the footer under ${FOOTER_MAX} characters`),
 });
 
@@ -68,6 +70,8 @@ export const DEFAULT_BRANDING = {
   address: "",
   gstin: "",
   licence_no: "",
+  tagline: "",
+  contact_person: "",
   footer: "",
 } as const;
 

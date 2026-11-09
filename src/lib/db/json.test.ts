@@ -41,3 +41,12 @@ describe("branding additions (DESIGN.md deviation 6)", () => {
     ).toThrow();
   });
 });
+
+describe("branding Part 2 fields (deviation 4)", () => {
+  it("defaults tagline and contact_person", () => {
+    const { tagline: _t, contact_person: _c, ...legacy } = DEFAULT_BRANDING;
+    const parsed = tenantBrandingSchema.parse(legacy);
+    expect(parsed.tagline).toBe("");
+    expect(parsed.contact_person).toBe("");
+  });
+});
