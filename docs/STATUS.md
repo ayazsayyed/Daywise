@@ -28,7 +28,20 @@ _Updated by Claude Code at the end of every session. Ayaz reads this + the live 
 - **Live e2e:** `.github/workflows/e2e-live.yml` runs the suite against production over an SSH tunnel to Postgres (fixtures + login tokens), real AI for the generate step, and deletes `e2e-*` tenants afterwards
 
 ### Day 5 acceptance
-LIVE_RESULTS_PLACEHOLDER
+Live = https://daywise.smallsoftware.in, checked through Actions (this sandbox cannot reach the site directly).
+- [x] **Second test tenant cannot see or guess SKTW data (manual + e2e).** Live e2e run [43279640075](https://github.com/ayazsayyed/Daywise/actions/runs/43279640075): tenant B gets 404 on tenant A's editor and generation job, never sees A in its list or its export, cannot reach `/admin` or A's export; near-miss/garbage/uuid share tokens → 404 without A's brand. Manual: same flows driven locally in Chromium (screens in `docs/design/actual/16*`). Production currently has **no real tenants**, so the check ran between two throwaway tenants rather than against SKTW itself
+- [x] **Suspend → admin locked, links still render; unsuspend restores** (live e2e): sessions revoked → `/login` → `/suspended`; share link renders; Reactivate → agent back in `/app`; after 31 days suspended → friendly unavailable page; audit rows written
+- [x] **Budget guard exhaustion simulated → generation completes unverified + Sentry event.** Ops `budget-sim` on production ([run 43280493750](https://github.com/ayazsayyed/Daywise/actions/runs/43280493750)): caps forced to 0 → "Google Places monthly budget exhausted for places_search (19/0); continuing unverified" (`alert=places-budget:places_search`, sent to Sentry and flushed), 3-day Jaipur draft completed in 8.2 s on Groq, hotels 0/2 and stops 0/5 verified, hotels marked "Verify before sending", Pexels heroes kept
+- [x] **Backup file appears in R2 and restores.** `backups/daywise-20261112T1753Z.dump` (84,726 bytes) uploaded; restored into a scratch database on the server and counted. "Restores locally" was done on the server, not on a laptop: this sandbox holds no R2 keys. Laptop steps are in the README
+- [x] **`pnpm check` + e2e green.** `pnpm check` 174 tests in CI; e2e 6/6 locally (dev and production build) and **6/6 against the live site** (real AI for the generate step), `e2e-*` tenants cleaned up (0 left)
+- Sentry: production test events accepted (ids above). Confirm they are visible in Sentry: search `alert:ops_sentry_test` and `alert:places-budget:places_search`
+
+## How to test Day 5 (live)
+1. Sign in at https://daywise.smallsoftware.in/login as the superadmin → `/admin`
+2. Create tenant (use your real SKTW details for Day 6, or a `…@e2e.test` owner for a throwaway one that gets no email)
+3. Tenant row → Suspend (type the name) → Reactivate; tenant name → limits, Check DNS, Open as, Download data, Delete
+4. Settings → Your data → Download; `/privacy`
+5. Actions → Ops (`status`, `backup-list`, `sentry-test`…) and Actions → E2E (live)
 
 ## Sentry (12 Nov 2026, Day 5 observability item pulled forward)
 - Sentry project **`adfox-media/daywise`** (javascript-nextjs), one DSN for app + worker; events tagged `service=app|worker|browser`, `environment`, `release` = git SHA.
@@ -197,13 +210,20 @@ Official run (`pnpm gen`, final code):
 - Admin "AI calls" amber threshold uses `daily_gen_cap` as the monthly AI cap per deviation 4's mapping; rename the column when Day 5 touches caps
 
 ## Blocked / questions
+- **Production has no tenants (Ayaz, Day 6):** the restore check showed `tenants=0`: SKTW was never seeded on the server, only the superadmin login exists. Create SKTW from `/admin` → Create tenant (with the custom domain `itinerary.shreekrishnatravelworld.com` if wanted) instead of running the seed, which uses placeholder branding. Owner email gets a sign-in link
+- **#15 Places prod key (Ayaz):** Google Cloud → create `daywise-prod` (IP `200.141.14.237`, Places API (New) only) → add it as Actions secret `GOOGLE_PLACES_API_KEY_PROD` → Actions → Ops → `set-places-key`. Rename the current key `daywise-dev`, application restriction None, API restriction Places API (New). Steps in SETUP.md Part C. I have no Google Cloud credentials here
+- **Sentry arrival (Ayaz):** events were accepted by the SDK with ids `72c642749c2f443298c0abb8d803d13e` (worker) and `63c3cbcd3a2b45b5bc8873ed90277b9f` (app) plus the budget warning. I cannot read Sentry from here (the CI token is upload-only). Please confirm in the dashboard
+- **Stale worktree (Ayaz, on your machine):** `.claude/worktrees` is not in the cloud checkout. In your local clone run `git worktree list`, then `git worktree remove --force <path>` for each entry under `.claude/worktrees`, then `git worktree prune`
+- **Caps naming:** the brief says "daily generation cap"; DESIGN deviation 4 maps the admin "AI calls / month" to `daily_gen_cap`. Resolved as: `daily_gen_cap` = drafts per day (as the brief says), new `monthly_ai_cap` = AI calls per month (as the PNG says). Defaults 50/600 existing, 30/600 for new tenants. Say if you want different numbers
+- **CSP uses `'unsafe-inline'` for scripts** (Next's inline hydration payload). A nonce-based CSP would force every page dynamic; revisit after v1
+- **Rate limits are in process memory** (one app container): reset on deploy; would need Postgres-backed counters if the app is ever scaled to more than one process
+- **Privacy policy** is a plain-language draft of what the code does (DPDP processor role); have a lawyer read it before calling it final
 - **#13 latency (Ayaz):** hit rate is 100%, but the "+3 s median" condition cannot be confirmed with 3 runs on Gemini (noise ±10 s; best estimate +2.5 s at 6 candidates per city). Accept, or ask for a 10-run A/B on Groq
 - **PDF bytes live in Postgres for up to 10 minutes** (`pdf_jobs.pdf`) so the app can hand the worker's PDF to the browser; deleted on download. That is my reading of "streams PDF; never stored" given app and worker are separate containers — say if you want a different hand-off
 - **Local test data:** to render the client page I generated and saved one real Kashmir itinerary and set the local SKTW branding to the contact details shown in the PNGs (maroon `#7A2B33`, phone, WhatsApp, email, office, contact person). Local DB only; production branding still comes from Settings
 - **Places key:** IP restriction removed for testing (12 Nov). Restore a restriction before production (by API: Places API (New) only, or the KVM's IP once it exists)
 - **Your `.env.local`:** if it sets `GEMINI_MODEL=gemini-2.5-flash`, change it to `gemini-3.8-flash` (2.5 Flash is closed to new API users). Optional `GROQ_REASONING_EFFORT=low` is the new default
 - **Production env gaps (Ayaz):** `R2_PUBLIC_URL` blank (fine for v1, files served through the app). Close #13/#14 on GitHub now that Day 4 is live.
-- **Places key:** now that the KVM exists, restrict `GOOGLE_PLACES_API_KEY` to the KVM IP (and Places API (New) only) in Google Cloud.
 - **DNS:** both `daywise` A records must stay **DNS only** (grey cloud). Proxied through Cloudflare, `*.daywise.smallsoftware.in` is outside Universal SSL and tenant hosts fail TLS; Caddy issues per-host certs itself.
 - **SKTW brand pack missing:** seed still uses placeholder theme `#1E6FB8` and empty contacts; set in `/app/settings` or commit `docs/reference/sktw/`
 - `frontend-design` skill not installed in this environment; screens were built from the PNGs + DESIGN.md directly
@@ -219,6 +239,7 @@ Open an itinerary → **Share** → Copy link (opens the client page) / Share on
 
 ## Live URLs
 - App: https://daywise.smallsoftware.in (login: https://daywise.smallsoftware.in/login, health: https://daywise.smallsoftware.in/api/health) — first deployed 12 Nov 2026, KVM 200.141.14.237
+- Admin: https://daywise.smallsoftware.in/admin · Privacy: https://daywise.smallsoftware.in/privacy · Ops / E2E (live): Actions → Ops, Actions → E2E (live)
 - Server: `ssh deploy@200.141.14.237` (key `~/.ssh/daywise_deploy`), stack in `~/daywise` (`docker compose ps|logs`); `ssh ayaz@…` for sudo
 - CI: https://github.com/ayazsayyed/Daywise/actions
 - Local design check: `pnpm dev`, then `SESSION_TOKEN=$(pnpm exec tsx scripts/dev/mint-session.ts) node scripts/design-shots.mjs` → `docs/design/actual/`
