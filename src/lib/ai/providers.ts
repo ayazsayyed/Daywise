@@ -1,7 +1,14 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createGroq } from "@ai-sdk/groq";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { APICallError, generateObject, type LanguageModel } from "ai";
+import {
+  APICallError,
+  generateObject,
+  JSONParseError,
+  NoObjectGeneratedError,
+  TypeValidationError,
+  type LanguageModel,
+} from "ai";
 import type { z } from "zod";
 
 import { env } from "@/lib/env";
@@ -112,6 +119,41 @@ export function shouldFallback(err: unknown): boolean {
   }
   const code = (err as { code?: string })?.code;
   return ["ECONNRESET", "ECONNREFUSED", "ETIMEDOUT", "ENOTFOUND", "EAI_AGAIN"].includes(code ?? "");
+}
+
+/**
+ * True when the model answered but its JSON was rejected — by the SDK's own
+ * zod check (NoObjectGeneratedError / TypeValidationError / JSONParseError) or
+ * by the provider's structured-output validator (Groq: 400 "Generated JSON does
+ * not match the expected schema"). Callers retry once with this message as
+ * feedback; it is not a reason to switch providers.
+ */
+export function isSchemaRejection(err: unknown): boolean {
+  if (
+    NoObjectGeneratedError.isInstance(err) ||
+    TypeValidationError.isInstance(err) ||
+    JSONParseError.isInstance(err)
+  )
+    return true;
+  if (APICallError.isInstance(err) && err.statusCode === 400) {
+    const text = `${err.message} ${err.responseBody ?? ""}`;
+    return /does not match the expected schema|json_validate_failed|failed to (generate|validate) json|schema/i.test(
+      text,
+    );
+  }
+  return false;
+}
+
+/** Short, model-readable reason for a schema rejection (used as retry feedback). */
+export function schemaRejectionFeedback(err: unknown): string {
+  if (TypeValidationError.isInstance(err) || NoObjectGeneratedError.isInstance(err)) {
+    const cause = (err as { cause?: unknown }).cause;
+    const msg = cause instanceof Error ? cause.message : (err as Error).message;
+    return msg.slice(0, 1_500);
+  }
+  if (APICallError.isInstance(err))
+    return `${err.message} ${err.responseBody ?? ""}`.slice(0, 1_500);
+  return err instanceof Error ? err.message.slice(0, 1_500) : String(err).slice(0, 1_500);
 }
 
 /** Default runner: Vercel AI SDK `generateObject`. */

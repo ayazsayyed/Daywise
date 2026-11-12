@@ -6,7 +6,9 @@ import { z } from "zod";
  * in), enumerated meal plans, and a money check on every free-text field.
  */
 
-export const BUDGET_TIERS = ["budget", "mid-range", "luxury"] as const;
+/** Matches the brief form (PNG 09): Budget / Mid-range / Premium / Luxury. */
+export const BUDGET_TIERS = ["budget", "mid-range", "premium", "luxury"] as const;
+export type BudgetTier = (typeof BUDGET_TIERS)[number];
 export const PACES = ["relaxed", "balanced", "packed"] as const;
 export const MEAL_PLANS = ["EP", "CP", "MAP", "AP"] as const;
 export const STOP_KINDS = ["sight", "activity", "meal", "transfer", "note"] as const;
@@ -124,7 +126,8 @@ export const daySchema = z
     summary: cleanText(400),
     /** One line: "Private car Srinagar → Gulmarg, about 2 h". */
     transport: cleanText(200),
-    stops: z.array(stopSchema).min(1).max(10),
+    /** At least one stop per day; the departure day may be empty (checked in itinerarySchemaFor). */
+    stops: z.array(stopSchema).max(10),
     /** The hotel for this night. Null only on the final (departure) day. */
     hotel: hotelSchema.nullable(),
   })
@@ -166,6 +169,13 @@ export function itinerarySchemaFor(brief: Pick<Brief, "nights">) {
         });
       }
       const last = i === it.days.length - 1;
+      if (!last && d.stops.length === 0) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["days", i, "stops"],
+          message: `Day ${i + 1} needs at least one stop`,
+        });
+      }
       if (!last && !d.hotel) {
         ctx.addIssue({
           code: "custom",

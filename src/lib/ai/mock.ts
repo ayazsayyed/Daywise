@@ -70,11 +70,13 @@ export function mockBrief(prompt: string, today = new Date()): Brief {
     : { adults: 2, children: 0, child_ages: [] };
   if (!/couple|honeymoon|family|adults?|pax|people/.test(p)) assumed.push("pax");
 
-  const budget = /luxury|premium|5 star/.test(p)
+  const budget = /luxury|lavish|5 star/.test(p)
     ? "luxury"
-    : /budget|sasta|economy|cheap/.test(p)
-      ? "budget"
-      : "mid-range";
+    : /premium|upper mid|4 star/.test(p)
+      ? "premium"
+      : /budget|sasta|economy|cheap/.test(p)
+        ? "budget"
+        : "mid-range";
   if (budget === "mid-range" && !/mid/.test(p)) assumed.push("budget");
   assumed.push("pace", "season");
 

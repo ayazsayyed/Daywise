@@ -3,7 +3,12 @@ import { logger } from "@/lib/logger";
 
 import { mockItinerary } from "./mock";
 import { systemPrompt } from "./prompts";
-import { callStructured, type CallOptions } from "./providers";
+import {
+  callStructured,
+  isSchemaRejection,
+  schemaRejectionFeedback,
+  type CallOptions,
+} from "./providers";
 import {
   attachDates,
   briefDates,
@@ -72,26 +77,36 @@ export async function generate(
 ): Promise<DatedItinerary> {
   const schema = itinerarySchemaFor(brief);
 
-  if (env.MOCK_AI === "1") {
+  // An injected runner (tests) bypasses the fixtures so the retry path is exercised.
+  if (env.MOCK_AI === "1" && !opts.runner) {
     return attachDates(schema.parse(mockItinerary(brief)), brief);
   }
 
   const base = briefToPrompt(brief, learnings);
   let feedback = "";
   for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await callStructured(
-      {
-        op: "generate",
-        schema: itineraryDraftSchema,
-        system: systemPrompt("itinerary"),
-        prompt: feedback
-          ? `${base}\n\nYour previous draft was rejected for these reasons:\n${feedback}\nReturn a corrected full itinerary.`
-          : base,
-        temperature: 0.5,
-        maxOutputTokens: 12_000,
-      },
-      opts,
-    );
+    let res;
+    try {
+      res = await callStructured(
+        {
+          op: "generate",
+          schema: itineraryDraftSchema,
+          system: systemPrompt("itinerary"),
+          prompt: feedback
+            ? `${base}\n\nYour previous draft was rejected for these reasons:\n${feedback}\nReturn a corrected full itinerary.`
+            : base,
+          temperature: 0.5,
+          maxOutputTokens: 12_000,
+        },
+        opts,
+      );
+    } catch (err) {
+      // Provider-side or SDK-side schema rejection: the model answered badly. Retry once.
+      if (!isSchemaRejection(err)) throw err;
+      feedback = schemaRejectionFeedback(err);
+      logger.warn({ attempt, feedback }, "itinerary rejected by structured-output schema");
+      continue;
+    }
     const parsed = schema.safeParse(res.object);
     if (parsed.success) return attachDates(parsed.data, brief);
     feedback = describeIssues(parsed.error);
