@@ -39,7 +39,7 @@ importers:
         specifier: 11.12.0
         version: 11.12.0
       '@sentry/nextjs':
-        specifier: ^11.12.0
+        specifier: 11.12.0
         version: 11.12.0(next@15.5.29(@opentelemetry/api@1.10.0)(@playwright/test@1.65.0)(@types/node@22.20.5)(react-dom@19.2.9(react@19.2.9))(react@19.2.9))(react@19.2.9)(vite@8.3.6(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15))
       '@sentry/node':
         specifier: 11.12.0
