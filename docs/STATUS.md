@@ -52,6 +52,7 @@ Day 2 — design restyle (addendum) done; AI pipeline built and CLI-tested with 
 - Admin "AI calls" amber threshold uses `daily_gen_cap` as the monthly AI cap per deviation 4's mapping; rename the column when Day 5 touches caps
 
 ## Blocked / questions
+- 12 Nov: hosting locked — new Hostinger KVM for Daywise (not yet purchased). Local-first until then: Day 3 and bug fixes #9–#11 proceed on Ayaz's machine; first deploy when the VPS exists.
 - **Branch cleanup:** `claude/*` branches were deleted locally and all work goes to `main`, but the session proxy refuses ref deletion on GitHub (HTTP 403). `origin/claude/sweet-carson-nm9bld` (identical to the pre-design `main`) must be deleted from the GitHub UI (Branches page) — Ayaz
 - **Server prerequisites (Ayaz):** copy the filled `.env` to `~/daywise/.env` on the KVM with `POSTGRES_PASSWORD`, `ACME_EMAIL` and now `SUPPORT_EMAIL` (optional), and set Actions secrets `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`
 - **Keys for Day 2 acceptance** (see above): Groq, Gemini, Places, Pexels in the server `.env`

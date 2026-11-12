@@ -88,7 +88,7 @@ Check: `pnpm gen "5-day Kashmir couple mid-range"` prints hotels with `verified`
 
 ## Part D — Server, DNS, email, storage, deploy
 
-**D1. KVM readiness** (SSH in as root)
+**D1. VPS readiness** — decision locked 12 Nov: a **new Hostinger KVM** (Mumbai) dedicated to Daywise; the old KVM with AdFox HQ / MarkupFox is not reused. Buy KVM 1 (4 GB) or KVM 2 (8 GB) with Ubuntu 24.04. SSH in as root:
 ```
 ss -tlnp | grep -E ':80 |:443 '
 ```
