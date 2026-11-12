@@ -57,7 +57,7 @@ describe("hotel candidates (#13)", () => {
 
   it("dedupes by place id and keeps a short area", () => {
     expect(candidates.srinagar!.map((c) => c.placeId)).toEqual(["a", "b"]);
-    expect(candidates.srinagar![1]!.area).toBe("Boulevard Rd, Dal Lake");
+    expect(candidates.srinagar![1]!.area).toBe("Dal Lake");
     expect(areaOf(null, "Gulmarg")).toBe("Gulmarg");
   });
 
@@ -82,7 +82,7 @@ describe("hotel candidates (#13)", () => {
     const prompt = briefToPrompt(brief, { hotels: candidates });
     expect(prompt).toContain("Choose hotels only from the list");
     expect(prompt).toContain("Candidates for Srinagar:");
-    expect(prompt).toContain("- Hotel Heevan · Boulevard Rd, Dal Lake");
+    expect(prompt).toContain("- Hotel Heevan · Dal Lake");
     expect(prompt).toContain("- The Khyber Himalayan Resort & Spa");
     expect(briefToPrompt(brief)).not.toContain("Hotel candidates");
     expect(hotelCandidatesPrompt({ srinagar: [] })).toBe("");

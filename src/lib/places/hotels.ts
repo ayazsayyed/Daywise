@@ -14,7 +14,7 @@ import { nameMatches } from "./match";
 export type HotelCandidate = {
   placeId: string;
   name: string;
-  /** Short locality from the address ("Boulevard Road, Dal Lake"). */
+  /** Short locality from the address ("Dal Lake"). */
   area: string;
   place: PlaceResult;
 };
@@ -24,7 +24,7 @@ export type HotelCandidates = Record<string, HotelCandidate[]>;
 
 export const CANDIDATES_PER_QUERY = 20;
 /** Cap per city in the prompt; keeps the prompt short and the model focused. */
-export const PROMPT_CANDIDATES_PER_CITY = 25;
+export const PROMPT_CANDIDATES_PER_CITY = 6;
 
 const TIER_LABEL: Record<(typeof BUDGET_TIERS)[number], string> = {
   budget: "budget",
@@ -51,7 +51,7 @@ export function areaOf(address: string | null, city: string): string {
   const before = (cityIdx > 0 ? parts.slice(0, cityIdx) : parts.slice(0, -2)).filter(
     (p) => !/^\d|\d{5,}/.test(p) && p.length <= 40,
   );
-  return before.slice(-2).join(", ") || city;
+  return before.slice(-1).join(", ") || city;
 }
 
 /** Dedupe by place id, tier-specific results first (they come first in `lists`). */
