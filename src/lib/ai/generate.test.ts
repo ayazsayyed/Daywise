@@ -77,11 +77,15 @@ describe("schema rejections (#10)", () => {
       return { object: golden, tokensIn: 1, tokensOut: 1 };
     }) as unknown as Runner;
 
-    const out = await generate(brief, undefined, {
-      chain: ["groq"],
-      runner,
-      resolveModel: fakeModel,
-    });
+    const out = await generate(
+      brief,
+      {},
+      {
+        chain: ["groq"],
+        runner,
+        resolveModel: fakeModel,
+      },
+    );
     expect(out.days).toHaveLength(5);
     expect(prompts).toHaveLength(2);
     expect(prompts[1]).toMatch(/previous draft was rejected/);
@@ -93,7 +97,7 @@ describe("schema rejections (#10)", () => {
       throw groqSchemaError();
     }) as unknown as Runner;
     await expect(
-      generate(brief, undefined, { chain: ["groq"], runner, resolveModel: fakeModel }),
+      generate(brief, {}, { chain: ["groq"], runner, resolveModel: fakeModel }),
     ).rejects.toBeInstanceOf(GenerationError);
     expect(runner).toHaveBeenCalledTimes(2);
   });
@@ -109,7 +113,7 @@ describe("schema rejections (#10)", () => {
       });
     }) as unknown as Runner;
     await expect(
-      generate(brief, undefined, { chain: ["groq"], runner, resolveModel: fakeModel }),
+      generate(brief, {}, { chain: ["groq"], runner, resolveModel: fakeModel }),
     ).rejects.toBeInstanceOf(APICallError);
     expect(runner).toHaveBeenCalledTimes(1);
   });

@@ -1,4 +1,5 @@
 import { env } from "@/lib/env";
+import { hotelCandidatesPrompt, type HotelCandidates } from "@/lib/places/hotels";
 import { logger } from "@/lib/logger";
 
 import { mockDay, mockItinerary } from "./mock";
@@ -38,7 +39,14 @@ export type Learnings = {
   preferences: string[];
 };
 
-function briefToPrompt(brief: Brief, learnings?: Learnings): string {
+/** What the draft is grounded in besides the brief: agency learnings and real hotels (#13). */
+export type DraftContext = {
+  learnings?: Learnings;
+  hotels?: HotelCandidates;
+};
+
+export function briefToPrompt(brief: Brief, ctx: DraftContext = {}): string {
+  const { learnings } = ctx;
   const dates = briefDates(brief);
   const lines = [
     `Destination: ${brief.destination} (${brief.country})`,
@@ -66,6 +74,8 @@ function briefToPrompt(brief: Brief, learnings?: Learnings): string {
       ...learnings.preferences.slice(0, 12).map((p) => `- ${p}`),
     );
   }
+  const hotels = hotelCandidatesPrompt(ctx.hotels);
+  if (hotels) lines.push(hotels);
   return lines.join("\n");
 }
 
@@ -76,7 +86,7 @@ function briefToPrompt(brief: Brief, learnings?: Learnings): string {
  */
 export async function generate(
   brief: Brief,
-  learnings?: Learnings,
+  ctx: DraftContext = {},
   opts: CallOptions = {},
 ): Promise<DatedItinerary> {
   const schema = itinerarySchemaFor(brief);
@@ -86,7 +96,7 @@ export async function generate(
     return attachDates(schema.parse(mockItinerary(brief)), brief);
   }
 
-  const base = briefToPrompt(brief, learnings);
+  const base = briefToPrompt(brief, ctx);
   let feedback = "";
   let callOpts = opts;
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -143,7 +153,7 @@ export async function generateDay(
   brief: Brief,
   days: DayContext[],
   dayNumber: number,
-  learnings?: Learnings,
+  ctx: DraftContext = {},
   opts: CallOptions = {},
 ): Promise<DatedDay> {
   const target = days.find((d) => d.day_number === dayNumber);
@@ -156,7 +166,7 @@ export async function generateDay(
   }
 
   const base = [
-    briefToPrompt({ ...brief, nights: days.length - 1 }, learnings),
+    briefToPrompt({ ...brief, nights: days.length - 1 }, ctx),
     "",
     "The itinerary as it stands (the agent may have edited it):",
     ...days.map(

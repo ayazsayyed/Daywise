@@ -9,6 +9,7 @@ import { db, schema } from "@/lib/db";
 import type { GenerationProgress } from "@/lib/db/schema";
 import { tenantScope } from "@/lib/db/tenant";
 import { verifyItinerary } from "@/lib/itinerary/verify";
+import { hotelCandidates, type HotelCandidates } from "@/lib/places/hotels";
 import type { GenerateJobData } from "@/lib/jobs/boss";
 import { logger } from "@/lib/logger";
 
@@ -44,7 +45,13 @@ export async function handleRegenerateDay(data: GenerateJobData): Promise<void> 
 
     await update({ status: "drafting" });
     let t = Date.now();
-    const learnings = await learningsFor(job.tenantId, brief.destination).catch(() => undefined);
+    const city = tree.days[idx]!.city ?? brief.cities[0] ?? brief.destination;
+    const [learnings, hotels] = await Promise.all([
+      learningsFor(job.tenantId, brief.destination).catch(() => undefined),
+      hotelCandidates([city], brief.country, brief.budget, job.tenantId).catch(
+        () => ({}) as HotelCandidates,
+      ),
+    ]);
     const day = await generateDay(
       brief,
       tree.days.map((d, i) => ({
@@ -56,7 +63,7 @@ export async function handleRegenerateDay(data: GenerateJobData): Promise<void> 
         hotel: d.hotel?.name ?? null,
       })),
       idx + 1,
-      learnings,
+      { learnings, hotels },
       { onUsage: recordAiUsage(job.tenantId) },
     );
     progress.steps.push({ name: "drafting", result: day.title, ms: Date.now() - t });
@@ -68,6 +75,7 @@ export async function handleRegenerateDay(data: GenerateJobData): Promise<void> 
       brief,
       job.tenantId,
       tenant.branding.theme_color,
+      { hotels },
     );
     const s = verified.stats;
     progress.steps.push({

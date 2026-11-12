@@ -5,7 +5,7 @@ const USAGE = "Usage: pnpm learnings:clear --tenant <slug> [--destination <name>
 export function parseClearArgs(argv: string[]): ClearArgs {
   const out: Partial<ClearArgs> = {};
   for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
+    const a = argv[i]!;
     const [flag, inline] = a.split("=", 2) as [string, string | undefined];
     const value = () => {
       const v = inline ?? argv[++i];
