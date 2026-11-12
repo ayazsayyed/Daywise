@@ -50,6 +50,12 @@ describe("assumed fields (#11)", () => {
     expect(reconcileAssumed("Dubai 4 days family of 4", b)).toContain("pax");
   });
 
+  it("'flying into Srinagar' states the entry city but not the exit (PNG 09)", () => {
+    const prompt = "5-day Kashmir for a couple, mid-range. Flying into Srinagar mid-March.";
+    const b = { ...mockBrief(prompt, today), assumed: ["entry_city", "exit_city"] };
+    expect(reconcileAssumed(prompt, b)).toEqual(["pace", "exit_city"]);
+  });
+
   it("adds what the model forgot (Kerala run returned no assumed fields)", () => {
     const prompt = "Kerala 6 days honeymoon";
     const b = { ...mockBrief(prompt, today), assumed: [] };

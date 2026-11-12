@@ -47,6 +47,8 @@ export function reconcileAssumed(prompt: string, brief: Brief): string[] {
     pace: PACE.test(p),
     destination: destinationStated,
     country: destinationStated || p.includes(brief.country.toLowerCase()),
+    // "Flying into Srinagar", "arriving in Kochi", "landing at Dubai" state the entry city.
+    entry_city: !!brief.entry_city && arrivesAt(p, brief.entry_city),
   };
 
   const out: string[] = [];
@@ -70,4 +72,14 @@ export function reconcileAssumed(prompt: string, brief: Brief): string[] {
     if (!out.includes(field)) out.push(field);
   }
   return out;
+}
+
+function arrivesAt(p: string, city: string): boolean {
+  const c = city
+    .toLowerCase()
+    .replace(/\s*\(.*\)\s*/g, "")
+    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(
+    `\\b(into|arriv(e|ing) (in|at)|land(ing)? (in|at)|fly(ing)? (in)?to|via|from) ${c}\\b`,
+  ).test(p);
 }
