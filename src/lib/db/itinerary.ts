@@ -1,5 +1,7 @@
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 
+import { type LearningCandidate, shouldRecordLearning } from "@/lib/ai/learning-policy";
+import { env } from "@/lib/env";
 import type { VerifiedDay } from "@/lib/itinerary/verify";
 import { addDays, checkOpRefs, type EditorOp } from "@/lib/itinerary/doc";
 
@@ -111,9 +113,11 @@ export function itineraryRepo(tenantId: string, conn: Db) {
   async function learn(
     tx: Tx,
     it: typeof schema.itineraries.$inferSelect,
-    kind: string,
+    candidate: LearningCandidate,
     payload: Record<string, unknown>,
   ) {
+    if (!shouldRecordLearning(candidate, { mockAi: env.MOCK_AI === "1" })) return;
+    const kind = candidate.kind;
     const destination = String((it.brief as { destination?: string } | null)?.destination ?? "");
     if (!destination) return;
     await tx.insert(schema.tenantLearnings).values({ tenantId, destination, kind, payload });
@@ -262,10 +266,15 @@ export function itineraryRepo(tenantId: string, conn: Db) {
               await writeStopOrder(tx, op.dayId, order);
               stopDay.set(op.stopId, op.dayId);
               if (op.title.trim().length >= 3)
-                await learn(tx, it, "stop_added", {
-                  title: op.title.trim(),
-                  city: cityOf.get(op.dayId) ?? "",
-                });
+                await learn(
+                  tx,
+                  it,
+                  { kind: "stop_added" },
+                  {
+                    title: op.title.trim(),
+                    city: cityOf.get(op.dayId) ?? "",
+                  },
+                );
               break;
             }
             case "stop.remove":
@@ -322,11 +331,16 @@ export function itineraryRepo(tenantId: string, conn: Db) {
                 checkIn: prev?.checkIn ?? "14:00",
                 checkOut: prev?.checkOut ?? "11:00",
               });
-              await learn(tx, it, "hotel_swap", {
-                from: prev?.name ?? "",
-                to: data.name,
-                city: cityOf.get(op.dayId) ?? "",
-              });
+              await learn(
+                tx,
+                it,
+                { kind: "hotel_swap", placeId: op.placeId },
+                {
+                  from: prev?.name ?? "",
+                  to: data.name,
+                  city: cityOf.get(op.dayId) ?? "",
+                },
+              );
               break;
             }
             case "hotel.remove":
