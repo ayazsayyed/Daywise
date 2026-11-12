@@ -123,6 +123,21 @@ export function itineraryRepo(tenantId: string, conn: Db) {
     await tx.insert(schema.tenantLearnings).values({ tenantId, destination, kind, payload });
   }
 
+  async function ensureShareLink(itineraryId: string, mintToken: () => string) {
+    const it = await own(conn, itineraryId);
+    if (it.isTemplate) throw new InvalidEditError("Templates cannot be shared");
+    const existing = await conn.query.shareLinks.findFirst({
+      where: eq(schema.shareLinks.itineraryId, it.id),
+      orderBy: [desc(schema.shareLinks.createdAt)],
+    });
+    if (existing) return existing;
+    const [row] = await conn
+      .insert(schema.shareLinks)
+      .values({ itineraryId: it.id, token: mintToken(), enabled: true })
+      .returning();
+    return row!;
+  }
+
   return {
     getItineraryTree(itineraryId: string) {
       return tree(conn, itineraryId);
@@ -497,6 +512,42 @@ export function itineraryRepo(tenantId: string, conn: Db) {
           .set({ updatedAt: new Date() })
           .where(eq(schema.itineraries.id, it.id));
       });
+    },
+
+    // ── Sharing (Day 4). Tokens are minted here; the public page resolves by token only. ──
+
+    /** The itinerary's share link (newest), or null before the first share. */
+    async getShareLink(itineraryId: string) {
+      const it = await own(conn, itineraryId);
+      const row = await conn.query.shareLinks.findFirst({
+        where: eq(schema.shareLinks.itineraryId, it.id),
+        orderBy: [desc(schema.shareLinks.createdAt)],
+      });
+      return row ?? null;
+    },
+
+    /** Returns the link, creating an enabled one on first use. Templates cannot be shared. */
+    ensureShareLink,
+
+    async setShareEnabled(itineraryId: string, enabled: boolean, mintToken: () => string) {
+      const link = await ensureShareLink(itineraryId, mintToken);
+      const [row] = await conn
+        .update(schema.shareLinks)
+        .set({ enabled, updatedAt: new Date() })
+        .where(eq(schema.shareLinks.id, link.id))
+        .returning();
+      return row!;
+    },
+
+    /** First share (copy, WhatsApp, PDF) moves a draft to Sent. Returns the new status. */
+    async markShared(itineraryId: string) {
+      const it = await own(conn, itineraryId);
+      if (it.status !== "draft") return it.status;
+      await conn
+        .update(schema.itineraries)
+        .set({ status: "sent" })
+        .where(eq(schema.itineraries.id, it.id));
+      return "sent" as const;
     },
   };
 }

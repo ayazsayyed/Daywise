@@ -7,6 +7,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -259,9 +260,28 @@ export const shareLinks = pgTable(
     enabled: boolean("enabled").notNull().default(true),
     viewCount: integer("view_count").notNull().default(0),
     lastViewedAt: timestamp("last_viewed_at", { withTimezone: true }),
+    /** "mobile" | "desktop" for the share panel's "last viewed, on mobile". */
+    lastViewedDevice: text("last_viewed_device"),
     ...timestamps,
   },
   (t) => [index("share_links_itinerary_idx").on(t.itineraryId)],
+);
+
+/**
+ * One row per link, device and hour (Part 2 deviation 7): a page open counts
+ * once per hour per device. `visitor` is a salted hash of IP + user agent; the
+ * raw IP is never stored. Rows older than a day are pruned on write.
+ */
+export const shareViews = pgTable(
+  "share_views",
+  {
+    linkId: uuid("link_id")
+      .notNull()
+      .references(() => shareLinks.id, { onDelete: "cascade" }),
+    visitor: text("visitor").notNull(),
+    hour: timestamp("hour", { withTimezone: true }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.linkId, t.visitor, t.hour] })],
 );
 
 // ── Places + usage + audit + learning ────────────────────────────────────
