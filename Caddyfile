@@ -15,7 +15,8 @@ https:// {
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options nosniff
-		Referrer-Policy strict-origin-when-cross-origin
+		# `?` = default only: keeps the app's no-referrer on /s/ share pages.
+		?Referrer-Policy strict-origin-when-cross-origin
 		-Server
 	}
 	reverse_proxy app:3000 {

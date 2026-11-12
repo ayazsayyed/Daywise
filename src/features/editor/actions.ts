@@ -14,6 +14,7 @@ import { parseStoredBrief } from "@/lib/ai/schemas";
 import { cachedPlace, geocodeCity, textSearch, type PlaceResult } from "@/lib/places/client";
 import { cityKey, filterCandidates, hotelCandidates } from "@/lib/places/hotels";
 import { enqueueRegenerateDay, getGenerationJob } from "@/features/itinerary/jobs";
+import { CapExceededError } from "@/lib/caps";
 
 import { toEditorDoc, toEditorImage } from "./load";
 
@@ -139,13 +140,18 @@ export async function regenerateDay(
     .catch(() => null);
   const idx = tree?.days.findIndex((d) => d.id === dayId) ?? -1;
   if (!tree || idx < 0) return { error: "Day not found" };
-  const job = await enqueueRegenerateDay(
-    session.tenant.id,
-    tree.id,
-    dayId,
-    `Regenerate day ${idx + 1} of ${tree.title}`,
-  );
-  return { jobId: job.id };
+  try {
+    const job = await enqueueRegenerateDay(
+      session.tenant.id,
+      tree.id,
+      dayId,
+      `Regenerate day ${idx + 1} of ${tree.title}`,
+    );
+    return { jobId: job.id };
+  } catch (err) {
+    if (err instanceof CapExceededError) return { error: err.message };
+    throw err;
+  }
 }
 
 export type DayJobView =

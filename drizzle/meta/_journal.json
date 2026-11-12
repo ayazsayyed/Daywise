@@ -43,6 +43,13 @@
       "when": 1794488782270,
       "tag": "0005_pdf",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794505484307,
+      "tag": "0006_day5_admin",
+      "breakpoints": true
     }
   ]
 }

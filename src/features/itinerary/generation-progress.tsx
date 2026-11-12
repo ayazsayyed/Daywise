@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Check, Circle, LoaderCircle } from "lucide-react";
 
 import { FlowBar, SectionLabel } from "@/components/ds";
@@ -174,9 +174,7 @@ export function GenerationProgress({
               {job.error ?? "The draft could not be finished."}
             </p>
             <div className="flex flex-wrap gap-3">
-              <form action={retryGeneration.bind(null, jobId)}>
-                <Button type="submit">Try again</Button>
-              </form>
+              <RetryButton jobId={jobId} />
               <Button variant="secondary" asChild>
                 <Link href="/app/new">Change the request</Link>
               </Button>
@@ -209,6 +207,29 @@ export function GenerationProgress({
           Back to itineraries
         </Link>
       </main>
+    </>
+  );
+}
+
+/** "Try again" re-queues the same brief; a cap refusal is shown in place. */
+function RetryButton({ jobId }: { jobId: string }) {
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <>
+      <Button
+        type="button"
+        disabled={pending}
+        onClick={() =>
+          start(async () => {
+            const res = await retryGeneration(jobId);
+            if (res?.error) setError(res.error);
+          })
+        }
+      >
+        {pending ? "Starting…" : "Try again"}
+      </Button>
+      {error && <p className="text-body-sm text-danger basis-full">{error}</p>}
     </>
   );
 }

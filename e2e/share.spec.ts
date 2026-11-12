@@ -1,33 +1,38 @@
-import { createHash, randomBytes } from "node:crypto";
+import { devices, expect, test } from "@playwright/test";
 
-import { devices, expect, test, type Page } from "@playwright/test";
-import postgres from "postgres";
+import {
+  createTestTenant,
+  deleteStaleTestTenants,
+  deleteTenants,
+  requireDb,
+  signIn,
+  type TestTenant,
+} from "./helpers";
 
 /**
- * Day 4 e2e: login → generate (mocked AI) → share link renders.
+ * Day 4 e2e: login → generate (mocked AI locally, real AI on the live site) →
+ * share link renders. Runs inside a throwaway e2e tenant, deleted afterwards.
  *
- * Needs the app and worker running with fixtures:
+ * Locally needs the app and worker running with fixtures:
  *   MOCK_AI=1 pnpm dev      MOCK_AI=1 pnpm worker      pnpm e2e
  * Login uses the real magic-link path: the test writes a one-time login token
  * (what the email would carry) and opens /auth/verify with it.
  */
 
-const EMAIL = (process.env.E2E_EMAIL ?? process.env.SUPERADMIN_EMAIL ?? "").toLowerCase();
-
-async function signIn(page: Page) {
-  test.skip(!process.env.DATABASE_URL || !EMAIL, "DATABASE_URL and SUPERADMIN_EMAIL are required");
-  const sql = postgres(process.env.DATABASE_URL!, { max: 1 });
-  const token = randomBytes(32).toString("base64url");
-  await sql`insert into login_tokens (email, token_hash, expires_at)
-            values (${EMAIL}, ${createHash("sha256").update(token).digest("hex")}, now() + interval '15 minutes')`;
-  await sql.end();
-  await page.goto(`/auth/verify?token=${encodeURIComponent(token)}`);
-  await expect(page).toHaveURL(/\/app/);
-}
+let tenant: TestTenant;
+test.beforeAll(async () => {
+  if (!process.env.DATABASE_URL) return;
+  await deleteStaleTestTenants();
+  tenant = await createTestTenant("share");
+});
+test.afterAll(async () => {
+  if (tenant) await deleteTenants([tenant.id]);
+});
 
 test("login → generate (mock AI) → share link renders on a phone", async ({ page, browser }) => {
-  test.setTimeout(120_000);
-  await signIn(page);
+  test.setTimeout(150_000);
+  requireDb();
+  await signIn(page, tenant.email, /\/app/);
 
   // Generate through the real flow (fixtures when MOCK_AI=1).
   await page.goto("/app/new");

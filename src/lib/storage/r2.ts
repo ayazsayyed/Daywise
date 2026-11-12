@@ -1,4 +1,10 @@
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  DeleteObjectsCommand,
+  GetObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 
 import { env } from "@/lib/env";
 
@@ -55,4 +61,25 @@ export function publicUrlFor(key: string): string {
     ? env.R2_PUBLIC_URL.replace(/\/$/, "")
     : `${env.APP_URL}/api/files`;
   return `${base}/${key.split("/").map(encodeURIComponent).join("/")}`;
+}
+
+/** Deletes every object under a prefix (tenant delete). Returns the count. */
+export async function deletePrefix(prefix: string): Promise<number> {
+  if (!prefix.endsWith("/")) throw new Error("prefix must end with /");
+  let deleted = 0;
+  let token: string | undefined;
+  do {
+    const page = await r2().send(
+      new ListObjectsV2Command({ Bucket: env.R2_BUCKET, Prefix: prefix, ContinuationToken: token }),
+    );
+    const keys = (page.Contents ?? []).flatMap((o) => (o.Key ? [{ Key: o.Key }] : []));
+    if (keys.length) {
+      await r2().send(
+        new DeleteObjectsCommand({ Bucket: env.R2_BUCKET, Delete: { Objects: keys, Quiet: true } }),
+      );
+      deleted += keys.length;
+    }
+    token = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (token);
+  return deleted;
 }

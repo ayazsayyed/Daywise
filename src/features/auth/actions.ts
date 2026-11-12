@@ -1,21 +1,17 @@
 "use server";
 
 import { and, eq, gt, sql } from "drizzle-orm";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { destroySession } from "@/lib/auth/session";
-import {
-  generateToken,
-  hashLoginToken,
-  LOGIN_TOKEN_TTL_MS,
-  normaliseEmail,
-} from "@/lib/auth/tokens";
+import { issueMagicLink } from "@/lib/auth/magic";
+import { LOGIN_TOKEN_TTL_MS, normaliseEmail } from "@/lib/auth/tokens";
 import { db, schema } from "@/lib/db";
-import { sendMail } from "@/lib/email/send";
-import { magicLinkEmail } from "@/lib/email/templates";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
+import { ipFrom, limiter, RULES } from "@/lib/ratelimit";
 
 export type LoginState =
   { status: "idle" } | { status: "sent"; email: string } | { status: "error"; message: string };
@@ -49,6 +45,18 @@ export async function requestMagicLink(_prev: LoginState, formData: FormData): P
   }
   const email = parsed.data.email;
 
+  // Day 5: 5 per 15 min per email (known or not) and 20 per 15 min per IP.
+  const ip = ipFrom(await headers());
+  const byEmail = limiter.hit(`login:email:${email}`, RULES.loginEmail);
+  const byIp = limiter.hit(`login:ip:${ip}`, RULES.loginIp);
+  if (!byEmail.ok || !byIp.ok) {
+    logger.warn({ ip, email }, "magic link rate limited");
+    return {
+      status: "error",
+      message: "Too many sign-in links requested. Try again in 15 minutes.",
+    };
+  }
+
   try {
     const user = await findOrProvisionUser(email);
     // Always respond identically so the form cannot be used to enumerate accounts.
@@ -73,15 +81,7 @@ export async function requestMagicLink(_prev: LoginState, formData: FormData): P
       };
     }
 
-    const token = generateToken();
-    await db.insert(schema.loginTokens).values({
-      email,
-      tokenHash: hashLoginToken(token),
-      expiresAt: new Date(Date.now() + LOGIN_TOKEN_TTL_MS),
-    });
-
-    const link = `${env.APP_URL}/auth/verify?token=${encodeURIComponent(token)}`;
-    await sendMail({ to: email, ...magicLinkEmail(link) });
+    await issueMagicLink(email);
     return { status: "sent", email };
   } catch (err) {
     logger.error({ err }, "magic link request failed");

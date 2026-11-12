@@ -91,6 +91,12 @@ export function relativeDay(d: DateInput, now: Date = new Date()): string {
 }
 
 /** Start of the current calendar month in IST, as a UTC instant. */
+/** 00:00 IST of the current day, as a UTC instant. */
+export function startOfDayIST(now: Date = new Date()): Date {
+  const ymd = new Intl.DateTimeFormat("en-CA", { timeZone: TIMEZONE }).format(now);
+  return new Date(`${ymd}T00:00:00+05:30`);
+}
+
 export function startOfMonthIST(now: Date = new Date()): Date {
   const parts = new Intl.DateTimeFormat("en-CA", {
     year: "numeric",

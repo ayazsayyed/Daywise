@@ -1,6 +1,7 @@
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { auditEvent } from "@/lib/audit";
 import { createSession } from "@/lib/auth/session";
 import { hashLoginToken } from "@/lib/auth/tokens";
 import { db, schema } from "@/lib/db";
@@ -40,6 +41,13 @@ export async function GET(req: NextRequest) {
 
   await createSession(user.id);
   logger.info({ userId: user.id }, "login");
+  await auditEvent("auth.login", {
+    tenantId: user.tenantId,
+    userId: user.id,
+    entity: "user",
+    entityId: user.id,
+    meta: { ua: req.headers.get("user-agent")?.slice(0, 200) ?? null },
+  });
 
   const dest = user.tenantId ? "/app" : user.role === "superadmin" ? "/admin" : "/no-tenant";
   return NextResponse.redirect(new URL(dest, env.APP_URL));

@@ -111,8 +111,10 @@ export const tenants = pgTable("tenants", {
   status: tenantStatusEnum("status").notNull().default("active"),
   suspendedAt: timestamp("suspended_at", { withTimezone: true }),
   plan: text("plan").notNull().default("standard"),
-  /** Shown in admin as "AI calls / month" (DESIGN.md deviation 4). */
+  /** Generations (full itinerary + regenerate-day) per IST day, enforced at enqueue (Day 5). */
   dailyGenCap: integer("daily_gen_cap").notNull().default(50),
+  /** AI calls per IST calendar month, enforced at enqueue; admin "AI calls / month" (deviation 4). */
+  monthlyAiCap: integer("monthly_ai_cap").notNull().default(600),
   monthlyPdfCap: integer("monthly_pdf_cap").notNull().default(200),
   branding: jsonb("branding").$type<TenantBranding>().notNull(),
   defaults: jsonb("defaults").$type<TenantDefaults>().notNull(),
@@ -158,6 +160,8 @@ export const sessions = pgTable(
     tokenHash: text("token_hash").notNull().unique(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     userAgent: text("user_agent"),
+    /** Superadmin "login as tenant": the tenant this session acts for (audited). */
+    actingTenantId: uuid("acting_tenant_id").references(() => tenants.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -453,6 +457,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
 
 export const sessionsRelations = relations(sessions, ({ one }) => ({
   user: one(users, { fields: [sessions.userId], references: [users.id] }),
+  actingTenant: one(tenants, { fields: [sessions.actingTenantId], references: [tenants.id] }),
 }));
 
 export const itinerariesRelations = relations(itineraries, ({ one, many }) => ({

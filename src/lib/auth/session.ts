@@ -21,6 +21,8 @@ export type CurrentSession = {
   id: string;
   user: SessionUser;
   tenant: typeof schema.tenants.$inferSelect | null;
+  /** Superadmin acting as another tenant ("login as tenant"); `tenant` is that tenant. */
+  impersonating: boolean;
 };
 
 export async function createSession(userId: string) {
@@ -63,7 +65,7 @@ export const getSession = cache(async (): Promise<CurrentSession | null> => {
   const tokenHash = hashSessionToken(token, env.SESSION_SECRET);
   const row = await db.query.sessions.findFirst({
     where: and(eq(schema.sessions.tokenHash, tokenHash), gt(schema.sessions.expiresAt, new Date())),
-    with: { user: { with: { tenant: true } } },
+    with: { user: { with: { tenant: true } }, actingTenant: true },
   });
   if (!row) return null;
 
@@ -76,6 +78,8 @@ export const getSession = cache(async (): Promise<CurrentSession | null> => {
       .catch(() => {});
   }
 
+  // Only a superadmin's session can act for another tenant; anyone else keeps their own.
+  const acting = row.user.role === "superadmin" ? (row.actingTenant ?? null) : null;
   return {
     id: row.id,
     user: {
@@ -84,6 +88,26 @@ export const getSession = cache(async (): Promise<CurrentSession | null> => {
       role: row.user.role,
       tenantId: row.user.tenantId,
     },
-    tenant: row.user.tenant ?? null,
+    tenant: acting ?? row.user.tenant ?? null,
+    impersonating: Boolean(acting),
   };
 });
+
+/** Superadmin "login as tenant" (null = back to the superadmin's own tenant). */
+export async function setActingTenant(sessionId: string, tenantId: string | null) {
+  await db
+    .update(schema.sessions)
+    .set({ actingTenantId: tenantId })
+    .where(eq(schema.sessions.id, sessionId));
+}
+
+/** Signs out every session of a tenant's users (suspend, delete). */
+export async function revokeTenantSessions(tenantId: string) {
+  await db.execute(
+    sql`delete from sessions where user_id in (select id from users where tenant_id = ${tenantId} and role <> 'superadmin')`,
+  );
+  await db
+    .update(schema.sessions)
+    .set({ actingTenantId: null })
+    .where(eq(schema.sessions.actingTenantId, tenantId));
+}

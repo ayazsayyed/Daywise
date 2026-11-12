@@ -8,6 +8,7 @@ import { AIUnavailableError } from "@/lib/ai/providers";
 import { briefSchema, type Brief } from "@/lib/ai/schemas";
 import { recordAiUsage } from "@/lib/ai/usage";
 import { requireTenant } from "@/lib/auth/guards";
+import { CapExceededError } from "@/lib/caps";
 import { tenantScope } from "@/lib/db/tenant";
 import { logger } from "@/lib/logger";
 
@@ -63,8 +64,15 @@ export async function startGeneration(input: {
         },
       }
     : null;
-  const job = await enqueueGeneration(session.tenant.id, prompt, brief, client);
-  redirect(`/app/new/${job.id}`);
+  let jobId: string;
+  try {
+    jobId = (await enqueueGeneration(session.tenant.id, prompt, brief, client)).id;
+  } catch (err) {
+    if (err instanceof CapExceededError) return { error: err.message };
+    logger.error({ err }, "enqueue failed");
+    return { error: "We could not start the generation. Please try again." };
+  }
+  redirect(`/app/new/${jobId}`);
 }
 
 export type JobView = {
@@ -99,13 +107,21 @@ export async function retryGeneration(jobId: string) {
   const job = await getGenerationJob(session.tenant.id, jobId);
   if (!job) redirect("/app/new");
   const brief = job.brief ? briefSchema.safeParse(job.brief) : null;
-  const next = await enqueueGeneration(
-    session.tenant.id,
-    job.prompt,
-    brief?.success ? brief.data : null,
-    job.client,
-  );
-  redirect(`/app/new/${next.id}`);
+  let nextId: string;
+  try {
+    nextId = (
+      await enqueueGeneration(
+        session.tenant.id,
+        job.prompt,
+        brief?.success ? brief.data : null,
+        job.client,
+      )
+    ).id;
+  } catch (err) {
+    if (err instanceof CapExceededError) return { error: err.message };
+    throw err;
+  }
+  redirect(`/app/new/${nextId}`);
 }
 
 /** Start-from-template: copy the template into a fresh draft and open it. */

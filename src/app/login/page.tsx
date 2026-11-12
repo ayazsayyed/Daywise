@@ -58,12 +58,17 @@ export default async function LoginPage({
 
         <footer className="text-body-sm text-ink-muted hidden items-center justify-between md:flex">
           <span>Itineraries for travel agents, drafted day by day.</span>
-          <a
-            href={`mailto:${support}`}
-            className="focus-ring text-ink-secondary rounded-sm underline underline-offset-4"
-          >
-            {support}
-          </a>
+          <span className="flex items-center gap-4">
+            <a href="/privacy" className="focus-ring text-ink-secondary rounded-sm">
+              Privacy
+            </a>
+            <a
+              href={`mailto:${support}`}
+              className="focus-ring text-ink-secondary rounded-sm underline underline-offset-4"
+            >
+              {support}
+            </a>
+          </span>
         </footer>
         <footer className="text-body-sm mt-auto flex items-center justify-between md:hidden">
           {talk}

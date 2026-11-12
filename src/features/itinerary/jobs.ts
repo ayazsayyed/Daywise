@@ -6,6 +6,7 @@ import type { Brief } from "@/lib/ai/schemas";
 import { db, schema } from "@/lib/db";
 import type { ItineraryClient } from "@/lib/db/schema";
 import { assertTenantId } from "@/lib/db/tenant";
+import { assertGenerationAllowed } from "@/lib/caps";
 import { getBoss, QUEUES } from "@/lib/jobs/boss";
 
 /**
@@ -19,6 +20,7 @@ export async function enqueueGeneration(
   client?: ItineraryClient | null,
 ) {
   const id = assertTenantId(tenantId);
+  await assertGenerationAllowed(db, id); // throws CapExceededError
   const [job] = await db
     .insert(schema.generationJobs)
     .values({
@@ -55,6 +57,7 @@ export async function enqueueRegenerateDay(
   label: string,
 ) {
   const id = assertTenantId(tenantId);
+  await assertGenerationAllowed(db, id); // throws CapExceededError
   const [job] = await db
     .insert(schema.generationJobs)
     .values({
