@@ -29,7 +29,7 @@ test.afterAll(async () => {
   if (tenant) await deleteTenants([tenant.id]);
 });
 
-test("login → generate (mock AI) → share link renders on a phone", async ({ page, browser }) => {
+test("login → generate → share link renders on a phone", async ({ page, browser }) => {
   test.setTimeout(150_000);
   requireDb();
   await signIn(page, tenant.email, /\/app/);
