@@ -359,7 +359,10 @@ export function itineraryRepo(tenantId: string, conn: Db) {
           .insert(schema.itineraries)
           .values({
             tenantId,
-            title: toTemplate || fromTemplate ? src.title : `${src.title} (copy)`,
+            title:
+              toTemplate || fromTemplate
+                ? src.title.replace(/(\s\(copy\))+$/, "")
+                : `${src.title.replace(/(\s\(copy\))+$/, "")} (copy)`,
             status: "draft",
             client: toTemplate ? null : fromTemplate ? null : src.client,
             brief: src.brief,
