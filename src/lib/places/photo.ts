@@ -15,7 +15,8 @@ export function encodePhotoRef(resourceName: string): string {
 }
 
 export function decodePhotoRef(ref: string): string | null {
-  if (!/^[A-Za-z0-9_-]{8,400}$/.test(ref)) return null;
+  // Real resource names are ~460 chars (~620 encoded); allow headroom, still bounded.
+  if (!/^[A-Za-z0-9_-]{8,2048}$/.test(ref)) return null;
   const name = Buffer.from(ref, "base64url").toString("utf8");
   return NAME.test(name) ? name : null;
 }

@@ -36,31 +36,37 @@ Driven in Chromium by script against the real UI, each checked after a page relo
 - [x] Works at 390 px: list cards + action sheet, editor tabs, drag handles visible on touch
 - Screenshots: `scripts/design-shots.mjs` now also shoots 06, 08, 09, 11, 13, 18, 19 (`ITINERARY_ID=<uuid>` for the editor)
 
-### Day 2 acceptance with real providers (Groq + Gemini; Places blocked)
-`pnpm gen` per prompt, final code, 12 Nov (sandbox → real Groq + Gemini; Places key rejected by Google's IP restriction, so every verification call failed):
+### Day 2 acceptance with real providers (12 Nov, Places IP restriction removed)
+Official run (`pnpm gen`, final code):
 
 | Prompt | Provider | Seconds | Hotels verified | Stops verified |
 |---|---|---|---|---|
-| 5-day Kashmir couple mid-range | groq · gpt-oss-120b | 9.7 | 0/4 * | 0/7 * |
-| Kerala 6 days honeymoon | groq · gpt-oss-120b | 10.5 | 0/5 * | 0/9 * |
-| Dubai 4 days family of 4 | groq · gpt-oss-120b | 43.8 | 0/3 * | 0/4 * |
-| Bali 7 days | groq · gpt-oss-120b | 44.9 | 0/6 * | 0/12 * |
-| Europe 10 days Paris Swiss | groq · gpt-oss-120b | 15.1 | 0/9 * | 0/11 * |
-| Fallback (Groq key unset) — Kashmir | gemini · gemini-3.8-flash | 40.7 | 0/4 * | 0/7 * |
+| 5-day Kashmir couple mid-range | groq · gpt-oss-120b | 7.6 | 3/4 (75%) † | 7/8 |
+| Kerala 6 days honeymoon | groq · gpt-oss-120b | 10.5 | 4/5 (80%) | 6/8 |
+| Dubai 4 days family of 4 | groq · gpt-oss-120b | 28.7 | 3/3 (100%) | 5/5 |
+| Bali 7 days | gemini · gemini-3.8-flash ‡ | 62.1 | 6/6 (100%) | 11/12 |
+| Europe 10 days Paris Swiss | groq · gpt-oss-120b | 11.9 | 9/9 (100%) | 8/12 |
+| Fallback (Groq key unset) — Kashmir | gemini · gemini-3.8-flash | 31.6 | 2/4 (50%) | 8/9 |
 
-\* Not a quality result: Places returned 403 "API key has an IP address restriction" on every call. Re-run on Ayaz's machine (or with an API-restricted key) to measure the ≥80% gate.
+† Contaminated: the local `tenant_learnings` held hotel swaps written by my Day 3 UI tests (mock hotels "Srinagar Residency", "Gulmarg Residency"); the generator followed them as agent preferences. Learnings cleared, then two clean re-runs each:
 
-- [x] 5 prompts each produce a valid itinerary (Europe failed on the first run — fixed, see below)
-- [ ] ≥80% hotels verified on Kashmir/Kerala/Dubai — **not measurable here**
-- [x] Median generation < 40 s on Groq: **15.1 s** (was 55 s before `reasoningEffort=low`; Dubai/Bali outliers are slow `enhance`/`draft` calls on Groq's side)
-- [x] Fallback to Gemini proven — with the Groq key unset (this sandbox's proxy injects the saved Groq key, so a *bad* key cannot be sent from here); the bad-key 401 path is covered by a unit test and now falls back (it did not before)
-- [ ] Photo proxy resized image + attribution header — needs Places
+| Prompt | Clean run 1 | Clean run 2 | Hotels, all clean runs |
+|---|---|---|---|
+| Kashmir | 2/4 · 7.6 s | 4/4 · 23.0 s | 6/8 = **75%** |
+| Kerala | 3/5 · 10.2 s | 5/5 · 39.1 s | 12/15 = **80%** (incl. official run) |
+| Dubai | 3/3 · 6.4 s | 3/3 · 30.4 s | 9/9 = **100%** |
 
-Fixes the acceptance runs forced (all in this branch, with tests): Gemini model `gemini-2.5-flash` closed to new users → `gemini-3.8-flash`; Gemini rejected the itinerary schema (`maxItems` on days); `RetryError` hid the real error from fallback and retry logic; 401/403 now fall back; a provider-side JSON rejection retries on the fallback model; assumed fields under-reported after the #11 tightening (guard now adds unstated core fields too).
+‡ Groq failed twice on Bali; the retry/fallback path finished it on Gemini.
+
+- [x] 5 prompts each produce a valid itinerary
+- [ ] **≥80% hotels verified on Kashmir/Kerala/Dubai — Kashmir fails (75%), Kerala borderline (80%)**. Every miss checked against Places: the verifier is right, the model named hotels that do not exist where it put them — "Hotel Grand Mumtaz, Srinagar" (the chain is in Gulmarg/Pahalgam; Places returns "Hotel Mumtaz Towers"), "Hotel Fort Kochi" (generic, no such hotel), "Spice Routes Hotel, Thekkady" (nearest is "Spice Grove"). Unverified hotels are kept and flagged "Verify before sending", not dropped. **Stopped here for Ayaz's call** — see Blocked
+- [x] Median generation < 40 s on Groq: 11.9 s (official run, Groq rows)
+- [x] Fallback to Gemini proven (Groq key unset; the bad-key 401 path is unit-tested)
+- [x] Photo proxy: `/api/photo/[ref]?w=800` → 200 `image/jpeg` 800×534, `cache-control: max-age=2592000`, `X-Photo-Attribution: Op Singh` + contributor URL. Needed a fix: real photo resource names (~460 chars) were rejected as "bad ref" by a 400-char limit, so no Google photo could ever display
+- [x] Unit tests green (117)
 
 ## Not done / carried over
-- **Places verification % (Day 2 gate) not measured** — see Blocked. Kashmir/Kerala/Dubai ≥80% is still unproven
-- Photo proxy "resized image with attribution header" check needs the same Places key
+- **Day 2 hotel-verification gate not met for Kashmir** (75%) — awaiting decision, see Blocked
 - Share link, PDF, WhatsApp (Copy link / PDF / Preview / Share buttons are visible but disabled) — Day 4
 - Pexels hero on `/login` and settings preview (resolver exists; Pexels key not in this environment — its `Authorization: <key>` header without a prefix cannot be saved through the sandbox credential form)
 - Per-must-see "Assumed" captions (PNG 09 shows some must-sees as assumed); the brief marks `must_sees` as a whole, so items are not individually flagged
@@ -121,7 +127,9 @@ Fixes the acceptance runs forced (all in this branch, with tests): Gemini model 
 - Admin "AI calls" amber threshold uses `daily_gen_cap` as the monthly AI cap per deviation 4's mapping; rename the column when Day 5 touches caps
 
 ## Blocked / questions
-- **Places key is IP-restricted (Ayaz):** Google rejects calls from cloud sessions (`fda3:e722:…`, changes per session). To run the ≥80% gate from a cloud session, create a second Places key restricted by *API* (Places API (New) only), save it in the Daywise cloud environment's network secrets for `places.googleapis.com` (header `X-Goog-Api-Key`), and keep the IP-restricted key for the KVM. Or run `pnpm gen` for the three prompts on your machine and paste the `Verification:` lines into #2
+- **Decision needed (Ayaz) — Kashmir hotels verify at 75% (< 80% gate).** The model sometimes invents or misplaces mid-range hotels. Options: (a) *grounded hotel choice* (recommended): before drafting, one cached Places lodging search per city (30-day cache, ~1 call per city per month) and the prompt picks hotels only from those real names; (b) *repair pass*: after verification, re-ask the model only for unverified hotels, giving it the Places lodging results for that city (1 extra AI call when there are misses); (c) accept as-is — unverified hotels are already flagged "Verify before sending". Not started until you choose
+- **Places key:** IP restriction removed for testing (12 Nov). Restore a restriction before production (by API: Places API (New) only, or the KVM's IP once it exists)
+- **Test data:** the local DB used for acceptance had learnings from UI tests; mock-mode swaps write real `tenant_learnings` rows. Consider not recording learnings when `MOCK_AI=1`
 - **Your `.env.local`:** if it sets `GEMINI_MODEL=gemini-2.5-flash`, change it to `gemini-3.8-flash` (2.5 Flash is closed to new API users). Optional `GROQ_REASONING_EFFORT=low` is the new default
 - **Merge:** CLAUDE.md says push to `main`; this session could only push `claude/day-3-setup-testing-qnfs5h`. Merge it into `main` when you are happy (main auto-deploys once the KVM exists)
 - 12 Nov: hosting locked — new Hostinger KVM for Daywise (not yet purchased). Local-first until then; first deploy when the VPS exists.
