@@ -108,16 +108,20 @@ On your **laptop**: `ssh-keygen -t ed25519 -f ~/.ssh/daywise_deploy -C daywise-d
 `cat ~/.ssh/daywise_deploy.pub` → paste into the server's `/home/deploy/.ssh/authorized_keys`; on the server `chown -R deploy:deploy /home/deploy/.ssh && chmod 600 /home/deploy/.ssh/authorized_keys`.
 Check from laptop: `ssh -i ~/.ssh/daywise_deploy deploy@<KVM_IP> docker ps` works.
 Firewall: `ufw allow 22,80,443/tcp` (and 443/udp for HTTP/3 if you like) if ufw is on.
+⚠ Also: `timedatectl set-timezone Asia/Kolkata`; check `systemctl is-enabled fail2ban unattended-upgrades`.
+⚠ The hardened sshd penalises clients that open connections without authenticating. `ssh-keyscan` with no `-t` probes every key type and the ecdsa/sk probes fail, which got the GitHub runner banned by fail2ban on the first deploy. The workflow now runs `ssh-keyscan -t ed25519`; if a run fails with "Connection closed by … port 22", check `sudo fail2ban-client status sshd` and `journalctl -u ssh`.
 
 **D2. DNS** (wherever smallsoftware.in is managed)
 - `A  daywise.smallsoftware.in  → <KVM_IP>`  TTL 300
 - `A  *.daywise.smallsoftware.in → <KVM_IP>`  TTL 300
 Check: `dig +short daywise.smallsoftware.in` returns the IP.
+⚠ If smallsoftware.in is on Cloudflare, both records must be **DNS only (grey cloud)**. Proxied, `dig` returns Cloudflare IPs, Caddy cannot issue certificates, and `*.daywise.smallsoftware.in` (a second-level wildcard) is not covered by Universal SSL, so tenant hosts fail the TLS handshake at the edge.
 
 **D3. Resend (magic-link email)**
 1. https://resend.com → sign up → Domains → Add `smallsoftware.in` → add the DKIM/SPF/MX records it shows at your DNS → wait for Verified.
 2. API Keys → Create → "daywise-prod" (Sending access) → copy.
 Check: domain shows Verified; keep key for the server `.env`.
+⚠ The verified sending domain is `updates.smallsoftware.in`, so `EMAIL_FROM` must be `Daywise <login@updates.smallsoftware.in>` (a bare domain without a mailbox is rejected).
 
 **D4. Cloudflare R2 (logos, cached hero images, backups)**
 1. Cloudflare dashboard → R2 → Create bucket `daywise` (APAC location).
@@ -154,12 +158,14 @@ SENTRY_DSN=...
 LOG_LEVEL=info
 ```
 `chmod 600 ~/daywise/.env`.
+⚠ Easier than nano: build the file on the laptop and pipe it over — `ssh deploy@<KVM_IP> 'umask 077; mkdir -p ~/daywise; cat > ~/daywise/.env' < server.env`, then delete the local copy. Verify with `grep -c = ~/daywise/.env`, never `cat`.
 
 **D7. GitHub Actions secrets**
 Repo → Settings → Secrets and variables → Actions → New repository secret:
 - `DEPLOY_HOST` = KVM IP
 - `DEPLOY_USER` = `deploy`
 - `DEPLOY_SSH_KEY` = contents of `~/.ssh/daywise_deploy` (the **private** key, whole file including BEGIN/END lines)
+⚠ From the laptop: `gh secret set DEPLOY_HOST --body <IP>`, `gh secret set DEPLOY_USER --body deploy`, `gh secret set DEPLOY_SSH_KEY < ~/.ssh/daywise_deploy`, and `gh api -X PUT repos/ayazsayyed/Daywise/actions/permissions/workflow -f default_workflow_permissions=write`.
 Also: Settings → Actions → General → Workflow permissions → **Read and write** (needed to push images to GHCR). And Packages: after the first build, make both packages (`daywise`, `daywise-worker`) visible to the repo or public so the server can pull; the workflow logs in with GITHUB_TOKEN which works for private packages owned by you.
 
 **D8. First deploy**
@@ -170,7 +176,7 @@ Checks:
 - `/app/settings` → upload the SKTW logo → it renders (R2 works).
 
 **D9. Branch cleanup**
-GitHub → repo → Branches → delete `claude/sweet-carson-nm9bld`.
+GitHub → repo → Branches → delete `claude/sweet-carson-nm9bld`. ⚠ Done 12 Nov together with the Day 3/4 branches (`git push origin --delete …` after confirming `git rev-list --count origin/main..origin/<branch>` is 0).
 
 ---
 

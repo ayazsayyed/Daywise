@@ -5,7 +5,15 @@ _Updated by Claude Code at the end of every session. Ayaz reads this + the live 
 ## Current phase
 Day 4 — share link, client page, PDF and WhatsApp built and accepted locally. Bugs #13 (grounded hotels) and #14 (no learnings from mock runs) fixed first; the #13 gate passed (Kashmir 12/12, Kerala 15/15 hotels verified, real Gemini).
 
-All work is on branch `claude/day-4-implementation-b21b03` (worktree). Merge it to `main` when you are happy; nothing is deployed (no KVM yet).
+Day 4 is merged to `main` (#12, #16). **First production deploy: 12 Nov 2026** on the new Hostinger KVM (Mumbai) at https://daywise.smallsoftware.in — see "First deploy" and "Live URLs" below.
+
+## First deploy (12 Nov 2026)
+- Host switched from `planner.smallsoftware.in` to **`daywise.smallsoftware.in`** everywhere (APP_URL, tenant subdomain suffix in `src/lib/config/brand.ts`, smoke check, docs). Tenant links are `<slug>.daywise.smallsoftware.in`.
+- Server: Hostinger KVM 2, Ubuntu 26.04.1, Docker 29 + Compose v5, users `ayaz` (sudo) and `deploy` (docker group, owns `~/daywise`). ufw 22/80/443 tcp + 443 udp, fail2ban sshd jail, sshd key-only with `AllowUsers ayaz deploy`, timezone Asia/Kolkata, unattended-upgrades on.
+- `~/daywise/.env` (600) set from `.env.example`: APP_URL, NODE_ENV=production, fresh SESSION_SECRET and POSTGRES_PASSWORD, Groq/Gemini/Places/Pexels/Resend keys, all four `R2_*`, ACME_EMAIL, `GEMINI_MODEL=gemini-3.8-flash`, `MOCK_AI=0`, `AI_PROVIDER=groq` → `gemini` fallback, `EMAIL_FROM=Daywise <login@updates.smallsoftware.in>` (the only Resend-verified domain). **Still blank:** `SENTRY_DSN`, `R2_PUBLIC_URL`, `DEEPSEEK_API_KEY`, `QWEN_API_KEY`.
+- Actions secrets `DEPLOY_HOST/USER/SSH_KEY` set; workflow permissions set to read-and-write. Deploy run `43259956591` green after one fix: `ssh-keyscan` now scans only the ed25519 key (the multi-type probe tripped sshd's per-source penalty + fail2ban on the hardened box).
+- Verified: `/api/health` → `{"ok":true,"db":"up"}` over a Let's Encrypt cert (HTTP/2, HSTS); `docker compose ps`: app, worker, postgres, caddy up/healthy, migrate exited 0; worker started with the three queues and Chromium headless shell running; unknown subdomains are refused a cert by `/api/tls-check`; magic link sent from `/login` to the superadmin.
+- Deleted merged remote branches `claude/sweet-carson-nm9bld`, `claude/day-3-setup-testing-qnfs5h`, `claude/day-4-implementation-b21b03`. Only `main` remains.
 
 ## Done (Day 4)
 ### Bugs first
@@ -162,11 +170,9 @@ Official run (`pnpm gen`, final code):
 - **Local test data:** to render the client page I generated and saved one real Kashmir itinerary and set the local SKTW branding to the contact details shown in the PNGs (maroon `#7A2B33`, phone, WhatsApp, email, office, contact person). Local DB only; production branding still comes from Settings
 - **Places key:** IP restriction removed for testing (12 Nov). Restore a restriction before production (by API: Places API (New) only, or the KVM's IP once it exists)
 - **Your `.env.local`:** if it sets `GEMINI_MODEL=gemini-2.5-flash`, change it to `gemini-3.8-flash` (2.5 Flash is closed to new API users). Optional `GROQ_REASONING_EFFORT=low` is the new default
-- **Merge:** Day 4 is on `claude/day-4-implementation-b21b03`; merge it into `main` when you are happy (main auto-deploys once the KVM exists). #13 and #14 stay open until then
-- 12 Nov: hosting locked — new Hostinger KVM for Daywise (not yet purchased). Local-first until then; first deploy when the VPS exists.
-- **Branch cleanup:** `claude/*` branches were deleted locally and all work goes to `main`, but the session proxy refuses ref deletion on GitHub (HTTP 403). `origin/claude/sweet-carson-nm9bld` (identical to the pre-design `main`) must be deleted from the GitHub UI (Branches page) — Ayaz
-- **Server prerequisites (Ayaz):** copy the filled `.env` to `~/daywise/.env` on the KVM with `POSTGRES_PASSWORD`, `ACME_EMAIL` and now `SUPPORT_EMAIL` (optional), and set Actions secrets `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`
-- **Keys for Day 2 acceptance** (see above): Groq, Gemini, Places, Pexels in the server `.env`
+- **Production env gaps (Ayaz):** `SENTRY_DSN` blank (no error reporting yet — create the Sentry project, add the DSN to `~/daywise/.env`, `docker compose up -d app worker`); `R2_PUBLIC_URL` blank (fine for v1, files served through the app). Close #13/#14 on GitHub now that Day 4 is live.
+- **Places key:** now that the KVM exists, restrict `GOOGLE_PLACES_API_KEY` to the KVM IP (and Places API (New) only) in Google Cloud.
+- **DNS:** both `daywise` A records must stay **DNS only** (grey cloud). Proxied through Cloudflare, `*.daywise.smallsoftware.in` is outside Universal SSL and tenant hosts fail TLS; Caddy issues per-host certs itself.
 - **SKTW brand pack missing:** seed still uses placeholder theme `#1E6FB8` and empty contacts; set in `/app/settings` or commit `docs/reference/sktw/`
 - `frontend-design` skill not installed in this environment; screens were built from the PNGs + DESIGN.md directly
 
@@ -180,6 +186,7 @@ pnpm worker         # terminal 2 — generation, regenerate-day and render-pdf
 Open an itinerary → **Share** → Copy link (opens the client page) / Share on WhatsApp / Download PDF. **Preview** opens the client page. e2e: run both with `MOCK_AI=1`, then `pnpm e2e`. Render one PDF without the queue: `pnpm tsx scripts/dev/render-pdf.ts <itineraryId> out.pdf`.
 
 ## Live URLs
-- App: none yet — local only until the KVM exists (http://localhost:3000 with the steps above)
+- App: https://daywise.smallsoftware.in (login: https://daywise.smallsoftware.in/login, health: https://daywise.smallsoftware.in/api/health) — first deployed 12 Nov 2026, KVM 200.141.14.237
+- Server: `ssh deploy@200.141.14.237` (key `~/.ssh/daywise_deploy`), stack in `~/daywise` (`docker compose ps|logs`); `ssh ayaz@…` for sudo
 - CI: https://github.com/ayazsayyed/Daywise/actions
 - Local design check: `pnpm dev`, then `SESSION_TOKEN=$(pnpm exec tsx scripts/dev/mint-session.ts) node scripts/design-shots.mjs` → `docs/design/actual/`
