@@ -14,7 +14,7 @@ Day 4 is merged to `main` (#12, #16). **First production deploy: 12 Nov 2026** o
 - `alerts.ts` uses `@sentry/core` so budget alerts reach Sentry from either process.
 - Config: server `~/daywise/.env` `SENTRY_DSN` set (backup `.env.bak-202611122244`); Actions **variable** `SENTRY_DSN` → `NEXT_PUBLIC_SENTRY_DSN` build arg; compose sets `SENTRY_RELEASE=${IMAGE_TAG}`.
 - Verified locally: app route error (DAYWISE-1) and worker startup failure (DAYWISE-4) arrived with readable frames; worker logs in Sentry Logs.
-- **Open (Ayaz):** browser source maps need an Actions secret `SENTRY_AUTH_TOKEN` (Sentry → Settings → Auth Tokens, org token). Without it the build skips upload and production browser stack traces stay minified.
+- Actions secret `SENTRY_AUTH_TOKEN` added (12 Nov) → the app image build uploads browser source maps to Sentry.
 
 ## First deploy (12 Nov 2026)
 - Host switched from `planner.smallsoftware.in` to **`daywise.smallsoftware.in`** everywhere (APP_URL, tenant subdomain suffix in `src/lib/config/brand.ts`, smoke check, docs). Tenant links are `<slug>.daywise.smallsoftware.in`.
@@ -179,7 +179,7 @@ Official run (`pnpm gen`, final code):
 - **Local test data:** to render the client page I generated and saved one real Kashmir itinerary and set the local SKTW branding to the contact details shown in the PNGs (maroon `#7A2B33`, phone, WhatsApp, email, office, contact person). Local DB only; production branding still comes from Settings
 - **Places key:** IP restriction removed for testing (12 Nov). Restore a restriction before production (by API: Places API (New) only, or the KVM's IP once it exists)
 - **Your `.env.local`:** if it sets `GEMINI_MODEL=gemini-2.5-flash`, change it to `gemini-3.8-flash` (2.5 Flash is closed to new API users). Optional `GROQ_REASONING_EFFORT=low` is the new default
-- **Production env gaps (Ayaz):** `SENTRY_AUTH_TOKEN` Actions secret for source maps (see Sentry section); `R2_PUBLIC_URL` blank (fine for v1, files served through the app). Close #13/#14 on GitHub now that Day 4 is live.
+- **Production env gaps (Ayaz):** `R2_PUBLIC_URL` blank (fine for v1, files served through the app). Close #13/#14 on GitHub now that Day 4 is live.
 - **Places key:** now that the KVM exists, restrict `GOOGLE_PLACES_API_KEY` to the KVM IP (and Places API (New) only) in Google Cloud.
 - **DNS:** both `daywise` A records must stay **DNS only** (grey cloud). Proxied through Cloudflare, `*.daywise.smallsoftware.in` is outside Universal SSL and tenant hosts fail TLS; Caddy issues per-host certs itself.
 - **SKTW brand pack missing:** seed still uses placeholder theme `#1E6FB8` and empty contacts; set in `/app/settings` or commit `docs/reference/sktw/`
