@@ -212,6 +212,8 @@ function HotelSwap({
   const [error, setError] = useState<string | null>(null);
   const [active, setActive] = useState(0);
   const [manual, setManual] = useState(false);
+  /** True from the first keystroke until the answer for the latest query arrives. */
+  const [waiting, setWaiting] = useState(false);
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [pending, start] = useTransition();
@@ -223,8 +225,12 @@ function HotelSwap({
   // Search after a short pause (each new query is one cached Places call).
   useEffect(() => {
     const q = query.trim();
-    if (q.length < 3 || manual) return;
+    if (q.length < 3 || manual) {
+      setWaiting(false);
+      return;
+    }
     const n = ++seq.current;
+    setWaiting(true);
     const t = setTimeout(() => {
       start(async () => {
         const res = await searchHotels(itineraryId, q, day.city).catch(() => ({
@@ -235,6 +241,7 @@ function HotelSwap({
         setResults(res.results);
         setError(res.error ?? null);
         setActive(0);
+        setWaiting(false);
       });
     }, 450);
     return () => clearTimeout(t);
@@ -332,7 +339,7 @@ function HotelSwap({
               ))}
               {results.length === 0 && (
                 <li className="text-body-sm text-ink-secondary p-3">
-                  {pending
+                  {pending || waiting
                     ? "Searching…"
                     : (error ??
                       (query.trim().length < 3

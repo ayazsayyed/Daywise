@@ -91,6 +91,11 @@ export async function searchHotels(
   });
   if (res.budgetExhausted)
     return { results: [], error: "Hotel search is paused this month. Enter the hotel manually." };
+  if (res.failed)
+    return {
+      results: [],
+      error: "Hotel search is unavailable right now. Try again or enter the hotel manually.",
+    };
   return {
     results: res.places.slice(0, 5).map((p) => ({
       placeId: p.id,

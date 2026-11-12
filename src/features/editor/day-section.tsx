@@ -466,7 +466,7 @@ export function StopContent({
         <InlineText
           value={stop.duration ?? ""}
           label={`Duration for ${stop.title}`}
-          placeholder="—"
+          placeholder=""
           maxLength={30}
           onChange={(v) => set({ duration: v || null })}
           className="text-caption text-ink-muted w-16 pt-1 text-right"

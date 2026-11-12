@@ -92,8 +92,16 @@ if (ID) {
   await shoot("19-mobile-editor-390", `/app/i/${ID}`, { ...M, authed: true, full: false });
   const swap = async (page) => {
     await page.locator("button:has-text('Swap')").first().click();
-    await page.waitForSelector("[role=option]", { timeout: 20_000 });
-    await page.locator("[role=option]").first().scrollIntoViewIfNeeded();
+    // Results, or the "No hotels found" / error row when Places is unavailable.
+    await page.waitForFunction(
+      () => {
+        const li = document.querySelector("[role=listbox] li");
+        return li && !/Searching/.test(li.textContent ?? "");
+      },
+      null,
+      { timeout: 30_000 },
+    );
+    await page.locator("[role=listbox]").scrollIntoViewIfNeeded();
   };
   await shoot("13-editor-swap-1440", `/app/i/${ID}`, { ...D, authed: true, full: false, before: swap });
 }

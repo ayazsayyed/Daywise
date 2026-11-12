@@ -95,9 +95,12 @@ export function InlineTime({
       type="time"
       value={value ?? ""}
       aria-label={label}
+      data-empty={!value}
       onChange={(e) => onChange(e.target.value || null)}
       className={cn(
         "text-body-sm text-ink-muted tnum -mx-1 w-[88px] rounded-sm bg-transparent px-1 outline-none",
+        // No time: blank until hovered or focused (no "--:-- --" noise).
+        "data-[empty=true]:[&:not(:focus):not(:hover)]:text-transparent",
         "hover:bg-surface-sunken/70 focus:bg-surface-raised focus:ring-indigo focus:ring-2",
         "[&::-webkit-calendar-picker-indicator]:hidden",
         className,
