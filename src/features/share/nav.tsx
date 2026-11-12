@@ -194,7 +194,7 @@ export function MobileNav({
                       <span className="text-ink block text-[16px] leading-6 font-semibold">
                         {d.city}
                       </span>
-                      <span className="text-ink-secondary block truncate text-[14px] leading-5">
+                      <span className="text-ink-secondary block text-[14px] leading-5">
                         {d.nightLine}
                       </span>
                     </span>
@@ -204,15 +204,17 @@ export function MobileNav({
                   </button>
                 </li>
               ))}
-              <li className="border-line border-t">
-                <button
-                  type="button"
-                  onClick={() => pick("price-and-terms")}
-                  className="text-ink w-full py-3.5 pl-[54px] text-left text-[16px]"
-                >
-                  {hasPrice ? "Price, inclusions and terms" : "Inclusions and terms"}
-                </button>
-              </li>
+              {hasPrice ? (
+                <li className="border-line border-t">
+                  <button
+                    type="button"
+                    onClick={() => pick("price-and-terms")}
+                    className="text-ink w-full py-3.5 pl-[54px] text-left text-[16px]"
+                  >
+                    Price, inclusions and terms
+                  </button>
+                </li>
+              ) : null}
               <li className="border-line border-t">
                 <button
                   type="button"
@@ -311,21 +313,23 @@ export function DesktopIndex({
             </a>
           </li>
         ))}
-        <li className="border-line border-b">
-          <a
-            href="#price-and-terms"
-            onClick={(e) => {
-              e.preventDefault();
-              go("price-and-terms");
-            }}
-            className={cn(
-              "block py-3 pl-7 text-[13px]",
-              current > days.length ? "text-ink font-semibold" : "text-ink",
-            )}
-          >
-            {hasPrice ? "Price and terms" : "Inclusions and terms"}
-          </a>
-        </li>
+        {hasPrice ? (
+          <li className="border-line border-b">
+            <a
+              href="#price-and-terms"
+              onClick={(e) => {
+                e.preventDefault();
+                go("price-and-terms");
+              }}
+              className={cn(
+                "block py-3 pl-7 text-[13px]",
+                current > days.length ? "text-ink font-semibold" : "text-ink",
+              )}
+            >
+              Price and terms
+            </a>
+          </li>
+        ) : null}
         <li className="border-line border-b">
           <a
             href="#contact"

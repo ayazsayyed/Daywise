@@ -149,7 +149,15 @@ export function Photo({
 }
 
 /** Missing hotel photo: sunken frame, small bed icon, the place name. */
-export function HotelPhoto({ image, name }: { image: ShareImage | null; name: string }) {
+export function HotelPhoto({
+  image,
+  name,
+  showCredit = true,
+}: {
+  image: ShareImage | null;
+  name: string;
+  showCredit?: boolean;
+}) {
   const real = image && !image.url.startsWith("/placeholder.svg") ? image : null;
   return (
     <figure className="photo">
@@ -177,7 +185,7 @@ export function HotelPhoto({ image, name }: { image: ShareImage | null; name: st
           </div>
         )}
       </div>
-      {real?.credit ? (
+      {showCredit && real?.credit ? (
         <figcaption className="text-ink-muted mt-1.5 text-[12px] leading-4">
           {real.credit}
         </figcaption>

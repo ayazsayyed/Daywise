@@ -1,5 +1,5 @@
 import type { TenantBranding, TenantDefaults } from "@/lib/db/schema";
-import { formatClock, formatDate, formatINR } from "@/lib/format";
+import { formatClock, formatDate, formatINR, formatWeekdayDate } from "@/lib/format";
 import type { EditorDoc, EditorImage } from "@/lib/itinerary/doc";
 import { computePricing } from "@/lib/itinerary/pricing";
 import { areaOf } from "@/lib/places/hotels";
@@ -30,6 +30,8 @@ export type ShareDay = {
   eyebrow: string;
   eyebrowPrint: string;
   dateShort: string;
+  /** "Sun 14 Mar" (Overview sheet). */
+  dateLabel: string;
   title: string;
   city: string;
   hero: ShareImage | null;
@@ -367,6 +369,7 @@ export function buildShareView(input: {
       eyebrow: `DAY ${n}${date ? ` · ${date}` : ""}`,
       eyebrowPrint: `DAY ${n}${date ? ` · ${date} ${year(d.date!)}` : ""}`,
       dateShort: d.date ? formatDate(d.date).split(" ").slice(0, 2).join(" ") : "",
+      dateLabel: d.date ? formatWeekdayDate(d.date) : "",
       title: d.title,
       city: d.city,
       hero: image(d.hero, heroCaption(d)),

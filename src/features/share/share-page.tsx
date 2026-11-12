@@ -19,9 +19,7 @@ export function SharePage({ view, print = false }: { view: ShareView; print?: bo
     anchor: d.anchor,
     city: d.city,
     nightLine: d.nightLine,
-    date: d.dateShort
-      ? `${d.eyebrow.split(" · ")[1]?.slice(0, 3) ?? ""} ${d.dateShort}`.trim()
-      : "",
+    date: d.dateLabel,
   }));
   const nights = view.days.filter((d) => d.hotel);
 
@@ -181,17 +179,17 @@ export function SharePage({ view, print = false }: { view: ShareView; print?: bo
         </section>
 
         {/* 3. Day index (mobile/tablet) */}
-        <div className="mt-10 min-[1100px]:mt-0 md:mt-14" data-noprint>
-          <MobileNav
-            days={navDays}
-            countWord={view.countWord}
-            dateLine={[view.dateRange, view.nightsLabel].filter(Boolean).join(" · ")}
-            hasPrice={!!view.price}
-            agencyName={agency.name}
-            bar={view.price?.bar ?? null}
-            whatsappHref={agency.whatsappHref}
-          />
-        </div>
+        {/* The nav is a direct child of <main> so it stays sticky through all the days. */}
+        <div className="h-10 min-[1100px]:hidden md:h-14" aria-hidden />
+        <MobileNav
+          days={navDays}
+          countWord={view.countWord}
+          dateLine={[view.dateRange, view.nightsLabel].filter(Boolean).join(" · ")}
+          hasPrice={!!view.price}
+          agencyName={agency.name}
+          bar={view.price?.bar ?? null}
+          whatsappHref={agency.whatsappHref}
+        />
 
         <div className="min-[1100px]:mt-16 min-[1100px]:grid min-[1100px]:grid-cols-[254px_minmax(0,1fr)] min-[1100px]:gap-x-[66px] print:block">
           <DesktopIndex days={navDays} countWord={view.countWord} hasPrice={!!view.price} />
@@ -205,7 +203,11 @@ export function SharePage({ view, print = false }: { view: ShareView; print?: bo
             {/* 5 + 6. Price, inclusions, terms */}
             <section
               id="price-and-terms"
-              className="share-terms border-line mt-16 border-t pt-8 md:mt-24 print:mt-0 print:border-0"
+              className={cn(
+                "share-terms border-line print:mt-0 print:border-0",
+                // Hidden price: no section, no rule; inclusions follow the last day (PNG 21).
+                view.price ? "mt-16 border-t pt-8 md:mt-24" : "mt-12 md:mt-16",
+              )}
             >
               <h2 className="text-ink mb-6 hidden text-[22pt] leading-tight font-semibold print:block">
                 {view.price ? "Price and terms" : "Inclusions and terms"}
@@ -292,7 +294,7 @@ function DaySection({ day, first, print }: { day: ShareDay; first: boolean; prin
       {day.hotel ? (
         <div className="share-hotel border-line bg-surface-sunken/60 mt-5 rounded-lg border p-3 md:p-3.5 print:bg-white">
           <div className="grid grid-cols-[112px_1fr] gap-x-4 md:grid-cols-[196px_1fr] md:gap-x-5 print:grid-cols-[48mm_1fr]">
-            <HotelPhoto image={day.hotel.image} name={day.hotel.name} />
+            <HotelPhoto image={day.hotel.image} name={day.hotel.name} showCredit={false} />
             <div className="min-w-0 py-0.5">
               <div className="text-label text-ink-secondary">{day.hotel.eyebrow}</div>
               <h3 className="text-ink mt-1 text-[18px] leading-6 font-semibold print:text-[13pt]">
@@ -307,6 +309,11 @@ function DaySection({ day, first, print }: { day: ShareDay; first: boolean; prin
             </div>
           </div>
           <HotelRows rows={day.hotel.rows} className="mt-3 md:hidden print:hidden" />
+          {day.hotel.image?.credit && !day.hotel.image.url.startsWith("/placeholder.svg") ? (
+            <p className="share-caption text-ink-muted mt-2.5 text-[12px] leading-4">
+              {day.hotel.image.credit}
+            </p>
+          ) : null}
         </div>
       ) : (
         <p className="border-line text-ink-secondary mt-5 border-y py-3 text-[13px] leading-5">
