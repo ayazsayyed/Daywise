@@ -3,7 +3,7 @@
 Tick each; put secrets in a password manager as a filled `.env`.
 
 - [ ] KVM: Ubuntu 22/24, Docker + Compose, `deploy` user with SSH key, ports 22/80/443 open
-- [ ] DNS: `A planner.smallsoftware.in → KVM`, `A *.planner.smallsoftware.in → KVM`
+- [ ] DNS: `A daywise.smallsoftware.in → KVM`, `A *.daywise.smallsoftware.in → KVM`
 - [ ] GitHub Actions secrets: `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`
 - [ ] Google Cloud: project, **India billing account**, Places API (New) enabled, server key restricted to KVM IP, budget alert ₹2,000
 - [ ] Groq API key; Google AI Studio key

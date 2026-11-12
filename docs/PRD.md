@@ -1,6 +1,6 @@
 # Daywise — PRD v1.1 (finalised 9 Nov 2026)
 
-**Product:** Daywise — admin product brand; tenant branding appears only on client-facing output. Hosted at planner.smallsoftware.in; tenants map a CNAME (e.g. itinerary.shreekrishnatravelworld.com).
+**Product:** Daywise — admin product brand; tenant branding appears only on client-facing output. Hosted at daywise.smallsoftware.in; tenants map a CNAME (e.g. itinerary.shreekrishnatravelworld.com).
 **One-liner:** A travel agent types "5-day Kashmir for a couple, mid-range"; Daywise drafts a verified, photo-rich, day-wise itinerary the agent edits and sends as a branded link or PDF in under 10 minutes.
 **Tenant #1:** Shree Krishna Travel World (SKTW). Target price ₹2,000/tenant/month, invoiced manually in v1.
 **Definition of done:** the SKTW tester completes prompt → edit → share unaided.

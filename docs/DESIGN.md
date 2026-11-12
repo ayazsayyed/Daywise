@@ -85,7 +85,7 @@ No sidebar, stat cards, icons in coloured circles, dashed empty states, illustra
 2. **Pricing panel: no automatic GST calculation.** Replace "GST 5% included" with an optional free-text "Tax note" line (e.g. "GST 5% included") shown under the total. No percentage maths in v1.
 3. **Client activity: no "Most time spent on Day 2 and Pricing".** Show views count, last viewed time, and device (mobile/desktop) only.
 4. **Super-admin: no "Agents" column, no "Staff" nav.** Single user per tenant in v1. Keep "Trial" as a tenant status alongside Active/Suspended. Caps shown are AI calls/month and PDFs/month (map to `daily_gen_cap` plus a new `monthly_pdf_cap`).
-5. **Tenant subdomains** read `<slug>.planner.smallsoftware.in` in copy, not `.daywise.in`, until the domain is bought. Keep the UI string in one config constant.
+5. **Tenant subdomains** read `<slug>.daywise.smallsoftware.in` in copy, not `.daywise.in`, until the domain is bought. Keep the UI string in one config constant.
 6. **Settings adds fields** the PDF shows and the schema lacked: `website`, `gstin`, `licence_no` (both optional, printed in footer when present), theme colour presets (six swatches + hex).
 7. **Client block adds** optional `referred_by` and `city`.
 8. **Mobile list** uses a `...` bottom sheet for actions; desktop uses row-hover actions. Both exist.

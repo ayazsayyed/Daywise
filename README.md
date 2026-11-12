@@ -37,5 +37,5 @@ images to GHCR → scp `docker-compose.yml` + `Caddyfile` to `~/daywise` on the 
 
 One-time server setup: Docker + Compose, `deploy` user with the Actions SSH key, ports 22/80/443 open,
 and the filled `.env` copied to `~/daywise/.env` (set `POSTGRES_PASSWORD`, `ACME_EMAIL`). Caddy issues TLS
-on demand; `/api/tls-check` approves only `planner.smallsoftware.in`, `<slug>.planner.smallsoftware.in`
+on demand; `/api/tls-check` approves only `daywise.smallsoftware.in`, `<slug>.daywise.smallsoftware.in`
 and tenants' custom domains.

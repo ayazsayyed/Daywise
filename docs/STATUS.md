@@ -153,7 +153,7 @@ Official run (`pnpm gen`, final code):
 - Sign-in error copy avoids contractions/exclamation marks per DESIGN.md "never do"
 - Link-sent state keeps the "New to Daywise? Talk to us" header link (PNG 05 drops it); harmless and keeps the layout stable
 - `/app` empty state primary "Create an itinerary" is disabled until `/app/new` exists (Day 3); PNG shows it enabled
-- Admin table omits the Agents column (deviation 4) and shows `<custom domain>` or `<slug>.planner.smallsoftware.in` under the name instead of "City · subdomain" (tenants have no city field)
+- Admin table omits the Agents column (deviation 4) and shows `<custom domain>` or `<slug>.daywise.smallsoftware.in` under the name instead of "City · subdomain" (tenants have no city field)
 - Admin "AI calls" amber threshold uses `daily_gen_cap` as the monthly AI cap per deviation 4's mapping; rename the column when Day 5 touches caps
 
 ## Blocked / questions

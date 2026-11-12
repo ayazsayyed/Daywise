@@ -110,9 +110,9 @@ Check from laptop: `ssh -i ~/.ssh/daywise_deploy deploy@<KVM_IP> docker ps` work
 Firewall: `ufw allow 22,80,443/tcp` (and 443/udp for HTTP/3 if you like) if ufw is on.
 
 **D2. DNS** (wherever smallsoftware.in is managed)
-- `A  planner.smallsoftware.in  → <KVM_IP>`  TTL 300
-- `A  *.planner.smallsoftware.in → <KVM_IP>`  TTL 300
-Check: `dig +short planner.smallsoftware.in` returns the IP.
+- `A  daywise.smallsoftware.in  → <KVM_IP>`  TTL 300
+- `A  *.daywise.smallsoftware.in → <KVM_IP>`  TTL 300
+Check: `dig +short daywise.smallsoftware.in` returns the IP.
 
 **D3. Resend (magic-link email)**
 1. https://resend.com → sign up → Domains → Add `smallsoftware.in` → add the DKIM/SPF/MX records it shows at your DNS → wait for Verified.
@@ -122,7 +122,7 @@ Check: domain shows Verified; keep key for the server `.env`.
 **D4. Cloudflare R2 (logos, cached hero images, backups)**
 1. Cloudflare dashboard → R2 → Create bucket `daywise` (APAC location).
 2. R2 → Manage R2 API Tokens → Create → Object Read & Write, scoped to bucket `daywise` → copy Access Key ID, Secret Access Key, and the Account ID (shown on the R2 overview).
-3. Optional now: Settings → Public access → connect a custom domain like `cdn.planner.smallsoftware.in` → that becomes `R2_PUBLIC_URL`. Skip for v1; files are served through the app.
+3. Optional now: Settings → Public access → connect a custom domain like `cdn.daywise.smallsoftware.in` → that becomes `R2_PUBLIC_URL`. Skip for v1; files are served through the app.
 
 **D5. Sentry (optional but cheap)**
 https://sentry.io → New project → Next.js → copy the DSN.
@@ -130,7 +130,7 @@ https://sentry.io → New project → Next.js → copy the DSN.
 **D6. Server `.env`**
 On the server as `deploy`: `mkdir -p ~/daywise && nano ~/daywise/.env` and fill from `.env.example`:
 ```
-APP_URL=https://planner.smallsoftware.in
+APP_URL=https://daywise.smallsoftware.in
 NODE_ENV=production
 SESSION_SECRET=<openssl rand -hex 32, a DIFFERENT one from local>
 SUPERADMIN_EMAIL=ayaz@adfox.media
@@ -165,7 +165,7 @@ Also: Settings → Actions → General → Workflow permissions → **Read and w
 **D8. First deploy**
 Repo → Actions → "CI & Deploy" → latest run → Re-run all jobs. Watch `Deploy to KVM`.
 Checks:
-- https://planner.smallsoftware.in/api/health → `{"ok":true}` over a valid certificate.
+- https://daywise.smallsoftware.in/api/health → `{"ok":true}` over a valid certificate.
 - `/login` → enter your email → magic link arrives from login@smallsoftware.in → `/app` loads.
 - `/app/settings` → upload the SKTW logo → it renders (R2 works).
 
@@ -197,5 +197,5 @@ Pass criteria: Kashmir, Kerala, Dubai ≥ 80% hotels verified; median < 40 s; fa
 
 ## Decisions this runbook assumes
 - Production stays on the Hostinger KVM **only if ports 80/443 are free** (D1). Otherwise escalate before continuing.
-- Tenant subdomains `<slug>.planner.smallsoftware.in` are kept; SKTW's CNAME is added on Day 6.
+- Tenant subdomains `<slug>.daywise.smallsoftware.in` are kept; SKTW's CNAME is added on Day 6.
 - Local and server use different `SESSION_SECRET` and `POSTGRES_PASSWORD`.

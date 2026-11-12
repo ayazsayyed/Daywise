@@ -1,10 +1,10 @@
 /**
  * Product-level UI strings. Client-safe (no secrets, no env access).
- * DESIGN.md deviation 5: tenant subdomains read `<slug>.planner.smallsoftware.in`
+ * DESIGN.md deviation 5: tenant subdomains read `<slug>.daywise.smallsoftware.in`
  * until the daywise.in domain is bought — keep the suffix in this one place.
  */
 export const PRODUCT_NAME = "Daywise";
-export const TENANT_DOMAIN_SUFFIX = "planner.smallsoftware.in";
+export const TENANT_DOMAIN_SUFFIX = "daywise.smallsoftware.in";
 
 export function tenantSubdomain(slug: string): string {
   return `${slug}.${TENANT_DOMAIN_SUFFIX}`;

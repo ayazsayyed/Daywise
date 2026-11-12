@@ -1,5 +1,5 @@
 # Daywise edge. On-demand TLS: Caddy asks the app whether a hostname is a known
-# tenant domain (or planner.smallsoftware.in) before requesting a certificate.
+# tenant domain (or daywise.smallsoftware.in) before requesting a certificate.
 {
 	email {$ACME_EMAIL}
 	on_demand_tls {

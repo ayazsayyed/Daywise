@@ -297,11 +297,11 @@ describe("share url", () => {
       shareUrl(
         { slug: "sktw", customDomain: "itinerary.sktw.example" },
         "abc",
-        "https://planner.smallsoftware.in",
+        "https://daywise.smallsoftware.in",
       ),
     ).toBe("https://itinerary.sktw.example/s/abc");
-    expect(shareUrl(t, "abc", "https://planner.smallsoftware.in")).toBe(
-      "https://sktw.planner.smallsoftware.in/s/abc",
+    expect(shareUrl(t, "abc", "https://daywise.smallsoftware.in")).toBe(
+      "https://sktw.daywise.smallsoftware.in/s/abc",
     );
     expect(shareUrl(t, "abc", "http://localhost:3000")).toBe("http://localhost:3000/s/abc");
   });

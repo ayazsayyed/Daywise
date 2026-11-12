@@ -17,7 +17,7 @@ describe("initialsOf", () => {
 });
 
 describe("tenantSubdomain", () => {
-  it("reads <slug>.planner.smallsoftware.in until the domain is bought", () => {
-    expect(tenantSubdomain("sktw")).toBe("sktw.planner.smallsoftware.in");
+  it("reads <slug>.daywise.smallsoftware.in until the domain is bought", () => {
+    expect(tenantSubdomain("sktw")).toBe("sktw.daywise.smallsoftware.in");
   });
 });
