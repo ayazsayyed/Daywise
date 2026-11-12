@@ -101,3 +101,41 @@ export function startOfMonthIST(now: Date = new Date()): Date {
   const m = parts.find((p) => p.type === "month")!.value;
   return new Date(`${y}-${m}-01T00:00:00+05:30`);
 }
+
+const weekdayDay = new Intl.DateTimeFormat("en-GB", {
+  weekday: "short",
+  day: "numeric",
+  timeZone: TIMEZONE,
+});
+const weekdayDayMonth = new Intl.DateTimeFormat("en-GB", {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  timeZone: TIMEZONE,
+});
+
+/** "Sun 14 Mar" — day labels in the editor and progress list. */
+export function formatWeekdayDate(d: DateInput): string {
+  return weekdayDayMonth.format(toDate(d)).replace(/,/g, "");
+}
+
+/** "Sun 14 – Thu 18 Mar 2027" · "Sat 27 Feb – Wed 3 Mar 2027" (brief and editor meta). */
+export function formatWeekdayRange(start: DateInput, end: DateInput): string {
+  const a = toDate(start);
+  const b = toDate(end);
+  const sameMonth = a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear();
+  const left = (sameMonth ? weekdayDay : weekdayDayMonth).format(a).replace(/,/g, "");
+  const right = `${weekdayDayMonth.format(b).replace(/,/g, "")} ${b.getFullYear()}`;
+  return `${left} – ${right}`;
+}
+
+/** "12:30 pm" from "12:30" (24h stored). */
+export function formatClock(hhmm: string | null | undefined): string {
+  if (!hhmm) return "";
+  const m = /^(\d{2}):(\d{2})$/.exec(hhmm);
+  if (!m) return hhmm;
+  const h = Number(m[1]);
+  const suffix = h >= 12 ? "pm" : "am";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${m[2]} ${suffix}`;
+}

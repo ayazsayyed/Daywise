@@ -1,5 +1,6 @@
 export { NeutralBadge, VerifiedBadge, VerifyBadge } from "./badge";
 export { Field } from "./field";
+export { FlowBar } from "./flow-bar";
 export { Page, PageTitle } from "./page";
 export { PhotoFrame, photoGround, type PhotoRatio } from "./photo-frame";
 export { SectionLabel } from "./section-label";

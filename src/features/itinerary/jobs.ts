@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 
 import type { Brief } from "@/lib/ai/schemas";
 import { db, schema } from "@/lib/db";
+import type { ItineraryClient } from "@/lib/db/schema";
 import { assertTenantId } from "@/lib/db/tenant";
 import { getBoss, QUEUES } from "@/lib/jobs/boss";
 
@@ -11,11 +12,22 @@ import { getBoss, QUEUES } from "@/lib/jobs/boss";
  * Enqueues a generation for the session's tenant and returns the job row id
  * the UI polls (Day 3 progress screen, PNG 10).
  */
-export async function enqueueGeneration(tenantId: string, prompt: string, brief?: Brief | null) {
+export async function enqueueGeneration(
+  tenantId: string,
+  prompt: string,
+  brief?: Brief | null,
+  client?: ItineraryClient | null,
+) {
   const id = assertTenantId(tenantId);
   const [job] = await db
     .insert(schema.generationJobs)
-    .values({ tenantId: id, prompt, brief: brief ?? null, status: "queued" })
+    .values({
+      tenantId: id,
+      prompt,
+      brief: brief ?? null,
+      client: client ?? null,
+      status: "queued",
+    })
     .returning();
   if (!job) throw new Error("could not create generation job");
   const boss = await getBoss();
