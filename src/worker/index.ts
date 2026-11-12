@@ -9,6 +9,7 @@ import {
   closePdfBrowser,
   handleRenderPdf,
   sweepPdfJobs,
+  warmPdfBrowser,
   type RenderPdfData,
 } from "./jobs/render-pdf";
 
@@ -48,6 +49,7 @@ async function main() {
       await handleRenderPdf(job.data);
     },
   );
+  warmPdfBrowser();
   const sweep = setInterval(
     () =>
       void sweepPdfJobs()

@@ -14,6 +14,7 @@ import { getBoss, QUEUES } from "@/lib/jobs/boss";
 import { logger } from "@/lib/logger";
 
 import { shareUrl } from "./url";
+import { agentShareMessage, waHref } from "./whatsapp";
 
 /**
  * Share panel (PNG 14). Every action takes the tenant from the session and
@@ -160,4 +161,29 @@ export async function getPdfJob(jobId: string): Promise<Result<PdfJobState>> {
   });
   if (!job) return { ok: false, message: "This PDF has expired. Please prepare it again." };
   return { ok: true, data: job as PdfJobState };
+}
+
+/** Dashboard quick actions: link (created if needed) + the prefilled WhatsApp href. */
+export async function quickShare(
+  itineraryId: string,
+): Promise<Result<{ url: string; enabled: boolean; whatsapp: string }>> {
+  try {
+    const { session, scope } = await scoped(itineraryId);
+    const link = await scope.ensureShareLink(itineraryId, mintShareToken);
+    const tree = await scope.getItineraryTree(itineraryId);
+    const url = shareUrl(session.tenant, link.token, env.APP_URL);
+    const destination = String((tree.brief as { destination?: string } | null)?.destination ?? "");
+    const text = agentShareMessage({
+      clientName: tree.client?.name,
+      destination,
+      agency: session.tenant.name,
+      link: url,
+    });
+    return {
+      ok: true,
+      data: { url, enabled: link.enabled, whatsapp: waHref(tree.client?.phone, text) },
+    };
+  } catch (err) {
+    return fail(err, "quickShare failed");
+  }
 }

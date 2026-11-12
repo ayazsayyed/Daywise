@@ -27,6 +27,11 @@ function getBrowser(): Promise<Browser> {
   return browser;
 }
 
+/** Launch Chromium at worker start so the first PDF of the day is not a cold start. */
+export function warmPdfBrowser() {
+  void getBrowser().catch((err) => logger.warn({ err }, "chromium not available"));
+}
+
 export async function closePdfBrowser() {
   const b = await browser?.catch(() => null);
   browser = null;

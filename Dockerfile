@@ -35,8 +35,10 @@ CMD ["node", "server.js"]
 
 # ── worker (pg-boss; also runs migrations) ──────────────────────────────
 FROM base AS worker
-ENV NODE_ENV=production DAYWISE_SERVICE=worker
+ENV NODE_ENV=production DAYWISE_SERVICE=worker PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 COPY --from=deps /app/node_modules ./node_modules
+# Chromium for the render-pdf job (Day 4): headless shell + its system libraries and fonts.
+RUN npx playwright install --with-deps --only-shell chromium && chmod -R o+rx /ms-playwright
 COPY package.json pnpm-lock.yaml tsconfig.json drizzle.config.ts ./
 COPY src ./src
 COPY scripts ./scripts
