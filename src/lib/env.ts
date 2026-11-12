@@ -44,6 +44,11 @@ const schema = z.object({
   R2_PUBLIC_URL: z.string().url().optional().or(z.literal("")),
 
   SENTRY_DSN: z.string().optional(),
+  /** Browser DSN; inlined at build time (Docker build arg). Usually equals SENTRY_DSN. */
+  NEXT_PUBLIC_SENTRY_DSN: z.string().optional(),
+  /** Git SHA of the deployed image (compose sets it from IMAGE_TAG). */
+  SENTRY_RELEASE: z.string().optional(),
+  SENTRY_ENVIRONMENT: z.string().optional(),
   LOG_LEVEL: z.enum(["trace", "debug", "info", "warn", "error", "fatal"]).default("info"),
 });
 

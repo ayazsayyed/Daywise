@@ -7,10 +7,19 @@ Day 4 — share link, client page, PDF and WhatsApp built and accepted locally. 
 
 Day 4 is merged to `main` (#12, #16). **First production deploy: 12 Nov 2026** on the new Hostinger KVM (Mumbai) at https://daywise.smallsoftware.in — see "First deploy" and "Live URLs" below.
 
+## Sentry (12 Nov 2026, Day 5 observability item pulled forward)
+- Sentry project **`adfox-media/daywise`** (javascript-nextjs), one DSN for app + worker; events tagged `service=app|worker|browser`, `environment`, `release` = git SHA.
+- App: `src/instrumentation.ts` + `src/sentry.{server,edge}.config.ts` + `src/instrumentation-client.ts` + `src/app/global-error.tsx`; `withSentryConfig` in `next.config.ts`. Errors, tracing (1.0 local / 0.1 prod) and pino → Sentry Logs.
+- Worker: `src/worker/instrument.ts` loaded via `tsx --import` (main thread only — pino-pretty's transport thread inherits `--import`). Jobs swallow their failures, so worker `error`/`fatal` pino logs become Sentry issues. Flushes before exit.
+- `alerts.ts` uses `@sentry/core` so budget alerts reach Sentry from either process.
+- Config: server `~/daywise/.env` `SENTRY_DSN` set (backup `.env.bak-202611122244`); Actions **variable** `SENTRY_DSN` → `NEXT_PUBLIC_SENTRY_DSN` build arg; compose sets `SENTRY_RELEASE=${IMAGE_TAG}`.
+- Verified locally: app route error (DAYWISE-1) and worker startup failure (DAYWISE-4) arrived with readable frames; worker logs in Sentry Logs.
+- **Open (Ayaz):** browser source maps need an Actions secret `SENTRY_AUTH_TOKEN` (Sentry → Settings → Auth Tokens, org token). Without it the build skips upload and production browser stack traces stay minified.
+
 ## First deploy (12 Nov 2026)
 - Host switched from `planner.smallsoftware.in` to **`daywise.smallsoftware.in`** everywhere (APP_URL, tenant subdomain suffix in `src/lib/config/brand.ts`, smoke check, docs). Tenant links are `<slug>.daywise.smallsoftware.in`.
 - Server: Hostinger KVM 2, Ubuntu 26.04.1, Docker 29 + Compose v5, users `ayaz` (sudo) and `deploy` (docker group, owns `~/daywise`). ufw 22/80/443 tcp + 443 udp, fail2ban sshd jail, sshd key-only with `AllowUsers ayaz deploy`, timezone Asia/Kolkata, unattended-upgrades on.
-- `~/daywise/.env` (600) set from `.env.example`: APP_URL, NODE_ENV=production, fresh SESSION_SECRET and POSTGRES_PASSWORD, Groq/Gemini/Places/Pexels/Resend keys, all four `R2_*`, ACME_EMAIL, `GEMINI_MODEL=gemini-3.8-flash`, `MOCK_AI=0`, `AI_PROVIDER=groq` → `gemini` fallback, `EMAIL_FROM=Daywise <login@updates.smallsoftware.in>` (the only Resend-verified domain). **Still blank:** `SENTRY_DSN`, `R2_PUBLIC_URL`, `DEEPSEEK_API_KEY`, `QWEN_API_KEY`.
+- `~/daywise/.env` (600) set from `.env.example`: APP_URL, NODE_ENV=production, fresh SESSION_SECRET and POSTGRES_PASSWORD, Groq/Gemini/Places/Pexels/Resend keys, all four `R2_*`, ACME_EMAIL, `GEMINI_MODEL=gemini-3.8-flash`, `MOCK_AI=0`, `AI_PROVIDER=groq` → `gemini` fallback, `EMAIL_FROM=Daywise <login@updates.smallsoftware.in>` (the only Resend-verified domain). **Still blank:** `R2_PUBLIC_URL`, `DEEPSEEK_API_KEY`, `QWEN_API_KEY`.
 - Actions secrets `DEPLOY_HOST/USER/SSH_KEY` set; workflow permissions set to read-and-write. Deploy run `43259956591` green after one fix: `ssh-keyscan` now scans only the ed25519 key (the multi-type probe tripped sshd's per-source penalty + fail2ban on the hardened box).
 - Verified: `/api/health` → `{"ok":true,"db":"up"}` over a Let's Encrypt cert (HTTP/2, HSTS); `docker compose ps`: app, worker, postgres, caddy up/healthy, migrate exited 0; worker started with the three queues and Chromium headless shell running; unknown subdomains are refused a cert by `/api/tls-check`; magic link sent from `/login` to the superadmin.
 - Deleted merged remote branches `claude/sweet-carson-nm9bld`, `claude/day-3-setup-testing-qnfs5h`, `claude/day-4-implementation-b21b03`. Only `main` remains.
@@ -170,7 +179,7 @@ Official run (`pnpm gen`, final code):
 - **Local test data:** to render the client page I generated and saved one real Kashmir itinerary and set the local SKTW branding to the contact details shown in the PNGs (maroon `#7A2B33`, phone, WhatsApp, email, office, contact person). Local DB only; production branding still comes from Settings
 - **Places key:** IP restriction removed for testing (12 Nov). Restore a restriction before production (by API: Places API (New) only, or the KVM's IP once it exists)
 - **Your `.env.local`:** if it sets `GEMINI_MODEL=gemini-2.5-flash`, change it to `gemini-3.8-flash` (2.5 Flash is closed to new API users). Optional `GROQ_REASONING_EFFORT=low` is the new default
-- **Production env gaps (Ayaz):** `SENTRY_DSN` blank (no error reporting yet — create the Sentry project, add the DSN to `~/daywise/.env`, `docker compose up -d app worker`); `R2_PUBLIC_URL` blank (fine for v1, files served through the app). Close #13/#14 on GitHub now that Day 4 is live.
+- **Production env gaps (Ayaz):** `SENTRY_AUTH_TOKEN` Actions secret for source maps (see Sentry section); `R2_PUBLIC_URL` blank (fine for v1, files served through the app). Close #13/#14 on GitHub now that Day 4 is live.
 - **Places key:** now that the KVM exists, restrict `GOOGLE_PLACES_API_KEY` to the KVM IP (and Places API (New) only) in Google Cloud.
 - **DNS:** both `daywise` A records must stay **DNS only** (grey cloud). Proxied through Cloudflare, `*.daywise.smallsoftware.in` is outside Universal SSL and tenant hosts fail TLS; Caddy issues per-host certs itself.
 - **SKTW brand pack missing:** seed still uses placeholder theme `#1E6FB8` and empty contacts; set in `/app/settings` or commit `docs/reference/sktw/`

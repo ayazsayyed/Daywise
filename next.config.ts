@@ -1,3 +1,4 @@
+import { withSentryConfig } from "@sentry/nextjs/config";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -28,4 +29,14 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  org: "adfox-media",
+  project: "daywise",
+  // Release = git SHA from CI (Docker build arg); unset locally.
+  release: { name: process.env.NEXT_PUBLIC_SENTRY_RELEASE || undefined },
+  // Source maps upload only when a build-time SENTRY_AUTH_TOKEN is present (CI).
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+  widenClientFileUpload: true,
+  silent: !process.env.CI,
+});

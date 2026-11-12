@@ -15,10 +15,16 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 FROM base AS build
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Sentry browser DSN + release are inlined into the client bundle at build time.
+ARG NEXT_PUBLIC_SENTRY_DSN=""
+ARG NEXT_PUBLIC_SENTRY_RELEASE=""
+ENV NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN NEXT_PUBLIC_SENTRY_RELEASE=$NEXT_PUBLIC_SENTRY_RELEASE
 # Build-time placeholders: env is validated lazily at request time, never at build.
 ENV NODE_ENV=production SESSION_SECRET=build-only-placeholder-secret-0123456789 \
     SUPERADMIN_EMAIL=build@example.com DATABASE_URL=postgres://build:build@localhost:5432/build
-RUN pnpm build
+# Source maps upload to Sentry only when the sentry_auth_token secret is provided.
+RUN --mount=type=secret,id=sentry_auth_token,required=false \
+    SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token 2>/dev/null || true)" pnpm build
 
 # ── app (Next.js standalone) ────────────────────────────────────────────
 FROM node:22-bookworm-slim AS app

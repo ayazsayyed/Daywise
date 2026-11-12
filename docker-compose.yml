@@ -34,6 +34,7 @@ services:
     env_file: .env
     environment:
       DAYWISE_SERVICE: app
+      SENTRY_RELEASE: ${IMAGE_TAG:-}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -46,6 +47,7 @@ services:
     env_file: .env
     environment:
       DAYWISE_SERVICE: worker
+      SENTRY_RELEASE: ${IMAGE_TAG:-}
     depends_on:
       migrate:
         condition: service_completed_successfully

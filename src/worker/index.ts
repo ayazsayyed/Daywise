@@ -1,5 +1,7 @@
 import "../../scripts/load-env";
 
+import { flush } from "@sentry/core";
+
 import { getBoss, QUEUES, type GenerateJobData } from "@/lib/jobs/boss";
 import { logger as base } from "@/lib/logger";
 
@@ -64,6 +66,7 @@ async function main() {
     clearInterval(sweep);
     await boss.stop({ graceful: true, timeout: 10_000 });
     await closePdfBrowser();
+    await flush(2000);
     process.exit(0);
   };
   process.on("SIGINT", () => void shutdown("SIGINT"));
@@ -72,5 +75,5 @@ async function main() {
 
 main().catch((err) => {
   logger.fatal({ err }, "worker failed to start");
-  process.exit(1);
+  void flush(2000).finally(() => process.exit(1));
 });

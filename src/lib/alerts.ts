@@ -2,8 +2,9 @@ import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 
 /**
- * Operational alerts. Goes to Sentry when SENTRY_DSN is set (full wiring is
- * Day 5 hardening), always to the log. Throttled per key so a stuck condition
+ * Operational alerts. Goes to Sentry when SENTRY_DSN is set (SDK initialised in
+ * `src/sentry.server.config.ts` for the app, `src/worker/instrument.ts` for the
+ * worker), always to the log. Throttled per key so a stuck condition
  * (e.g. Places budget exhausted) alerts once an hour, not once per request.
  */
 const lastSent = new Map<string, number>();
@@ -23,7 +24,8 @@ export async function alert(
   (level === "error" ? logger.error : logger.warn).call(logger, { alert: key, ...extra }, message);
   if (!env.SENTRY_DSN) return;
   try {
-    const Sentry = await import("@sentry/nextjs");
+    // @sentry/core: runtime-agnostic, shares the client initialised by either SDK.
+    const Sentry = await import("@sentry/core");
     Sentry.captureMessage(message, { level, tags: { alert: key }, extra });
   } catch (err) {
     logger.error({ err }, "Sentry capture failed");
