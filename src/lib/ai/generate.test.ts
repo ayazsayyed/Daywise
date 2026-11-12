@@ -1,9 +1,9 @@
-import { APICallError, NoObjectGeneratedError } from "ai";
+import { APICallError, NoObjectGeneratedError, RetryError } from "ai";
 import { describe, expect, it, vi } from "vitest";
 
 import { generate, GenerationError } from "./generate";
 import { mockBrief, mockItinerary } from "./mock";
-import { isSchemaRejection, type Runner } from "./providers";
+import { isSchemaRejection, shouldFallback, type Runner } from "./providers";
 
 const brief = mockBrief("5-day Kashmir couple mid-range", new Date("2026-11-08T00:00:00Z"));
 const golden = mockItinerary(brief);
@@ -44,6 +44,29 @@ describe("schema rejections (#10)", () => {
       isRetryable: false,
     });
     expect(isSchemaRejection(auth)).toBe(false);
+  });
+
+  it("sees through the SDK's RetryError wrapper (Europe 10-day run on Groq)", () => {
+    const failedGeneration = new APICallError({
+      message:
+        "Failed to generate JSON. Please adjust your prompt. See 'failed_generation' for more details.",
+      url: "https://api.groq.com/openai/v1/chat/completions",
+      requestBodyValues: {},
+      statusCode: 400,
+      isRetryable: false,
+    });
+    const wrapped = new RetryError({
+      message: "Failed after 2 attempts",
+      reason: "errorNotRetryable",
+      errors: [failedGeneration, failedGeneration],
+    });
+    expect(isSchemaRejection(wrapped)).toBe(true);
+    const network = new RetryError({
+      message: "Failed after 3 attempts",
+      reason: "maxRetriesExceeded",
+      errors: [Object.assign(new Error("getaddrinfo ENOTFOUND"), { code: "ENOTFOUND" })],
+    });
+    expect(shouldFallback(network)).toBe(true);
   });
 
   it("retries once with the provider's error as feedback, then succeeds", async () => {

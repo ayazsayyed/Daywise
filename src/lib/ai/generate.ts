@@ -6,6 +6,7 @@ import { systemPrompt } from "./prompts";
 import {
   callStructured,
   isSchemaRejection,
+  retryChain,
   schemaRejectionFeedback,
   type CallOptions,
 } from "./providers";
@@ -87,6 +88,7 @@ export async function generate(
 
   const base = briefToPrompt(brief, learnings);
   let feedback = "";
+  let callOpts = opts;
   for (let attempt = 0; attempt < 2; attempt++) {
     let res;
     try {
@@ -101,12 +103,14 @@ export async function generate(
           temperature: 0.5,
           maxOutputTokens: 12_000,
         },
-        opts,
+        callOpts,
       );
     } catch (err) {
       // Provider-side or SDK-side schema rejection: the model answered badly. Retry once.
       if (!isSchemaRejection(err)) throw err;
       feedback = schemaRejectionFeedback(err);
+      // The provider rejected its own JSON: give the one retry to the fallback model first.
+      callOpts = { ...opts, chain: retryChain(opts) };
       logger.warn({ attempt, feedback }, "itinerary rejected by structured-output schema");
       continue;
     }
@@ -168,6 +172,7 @@ export async function generateDay(
   ].join("\n");
 
   let feedback = "";
+  let callOpts = opts;
   for (let attempt = 0; attempt < 2; attempt++) {
     let res;
     try {
@@ -182,11 +187,13 @@ export async function generateDay(
           temperature: 0.7,
           maxOutputTokens: 4_000,
         },
-        opts,
+        callOpts,
       );
     } catch (err) {
       if (!isSchemaRejection(err)) throw err;
       feedback = schemaRejectionFeedback(err);
+      // The provider rejected its own JSON: give the one retry to the fallback model first.
+      callOpts = { ...opts, chain: retryChain(opts) };
       continue;
     }
     const parsed = schema.safeParse(res.object);

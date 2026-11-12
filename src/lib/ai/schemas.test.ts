@@ -172,3 +172,15 @@ describe("departure day stops (#10)", () => {
     expect(systemPrompt("itinerary")).toMatch(/departure day always has at least one stop/);
   });
 });
+
+describe("provider-facing JSON schema", () => {
+  it("has no maxItems/minItems on days (Gemini rejects it with 'invalid argument')", async () => {
+    const { toJSONSchema } = await import("zod");
+    const { itineraryDraftSchema } = await import("./schemas");
+    const js = toJSONSchema(itineraryDraftSchema) as unknown as {
+      properties: { days: { maxItems?: number; minItems?: number } };
+    };
+    expect(js.properties.days.maxItems).toBeUndefined();
+    expect(js.properties.days.minItems).toBeUndefined();
+  });
+});

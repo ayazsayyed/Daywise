@@ -1,5 +1,5 @@
 // Usage: SESSION_TOKEN=$(pnpm exec tsx scripts/dev/mint-session.ts) node scripts/design-shots.mjs
-// Requires `pnpm dev` on :3000. Writes docs/design/actual/*.png at 1440 and 390 for PNG comparison.
+// Requires `pnpm dev` on :3000 (and ITINERARY_ID=<uuid> for the editor shots). Writes docs/design/actual/*.png at 1440 and 390 for PNG comparison.
 // Screenshots every restyled screen at 1440 and 390 into docs/design/actual/.
 import { chromium } from "@playwright/test";
 import { mkdirSync } from "node:fs";
@@ -62,11 +62,40 @@ const sent = async (page) => {
 await shoot("05-signin-link-sent-1440", "/login", { ...D, before: sent });
 await shoot("05-signin-link-sent-390", "/login", { ...M, before: sent });
 
-await shoot("07-itineraries-empty-1440", "/app", { ...D, authed: true });
-await shoot("07-itineraries-empty-390", "/app", { ...M, authed: true });
+if (process.env.EMPTY === "1") {
+  // Only meaningful on a tenant with no itineraries.
+  await shoot("07-itineraries-empty-1440", "/app", { ...D, authed: true });
+  await shoot("07-itineraries-empty-390", "/app", { ...M, authed: true });
+}
 await shoot("15-agency-settings-1440", "/app/settings", { ...D, authed: true });
 await shoot("15-agency-settings-390", "/app/settings", { ...M, authed: true });
 await shoot("16-superadmin-tenants-1440", "/admin", { ...D, authed: true });
 await shoot("16-superadmin-tenants-390", "/admin", { ...M, authed: true });
+
+// Day 3 screens. List needs itineraries; editor needs ITINERARY_ID (any of the tenant's).
+await shoot("06-itineraries-list-1440", "/app", { ...D, authed: true, full: false });
+await shoot("18-itineraries-list-390", "/app", { ...M, authed: true, full: false });
+await shoot("08-new-step1-describe-1440", "/app/new", { ...D, authed: true });
+const brief = async (page) => {
+  await page.fill(
+    "#trip-request",
+    "5-day Kashmir for a couple, mid-range. They want a shikara ride and snow at Gulmarg. Flying into Srinagar mid-March.",
+  );
+  await page.keyboard.press("Control+Enter");
+  await page.waitForSelector("text=Check the brief", { timeout: 60_000 });
+  await page.fill("#client", "Ananya & Rohit Kapoor");
+};
+await shoot("09-new-step2-brief-1440", "/app/new", { ...D, authed: true, before: brief });
+const ID = process.env.ITINERARY_ID;
+if (ID) {
+  await shoot("11-editor-day1-1440", `/app/i/${ID}`, { ...D, authed: true, full: false });
+  await shoot("19-mobile-editor-390", `/app/i/${ID}`, { ...M, authed: true, full: false });
+  const swap = async (page) => {
+    await page.locator("button:has-text('Swap')").first().click();
+    await page.waitForSelector("[role=option]", { timeout: 20_000 });
+    await page.locator("[role=option]").first().scrollIntoViewIfNeeded();
+  };
+  await shoot("13-editor-swap-1440", `/app/i/${ID}`, { ...D, authed: true, full: false, before: swap });
+}
 
 await browser.close();

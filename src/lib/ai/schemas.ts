@@ -155,7 +155,9 @@ export const itineraryDraftSchema = z
   .object({
     title: cleanText(80).refine((t) => t.length >= 4),
     summary: cleanText(500),
-    days: z.array(daySchema).min(1).max(31),
+    // No min/max here: Gemini rejects maxItems on this array ("invalid argument").
+    // The exact count (nights + 1, nights ≤ 30) is enforced by itinerarySchemaFor.
+    days: z.array(daySchema),
     /** Short practical notes, e.g. the weather disclaimer. No prices. */
     notes: z.array(cleanText(240)).max(8),
   })

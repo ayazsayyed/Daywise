@@ -7,6 +7,7 @@ import { systemPrompt } from "./prompts";
 import {
   callStructured,
   isSchemaRejection,
+  retryChain,
   schemaRejectionFeedback,
   type CallOptions,
 } from "./providers";
@@ -40,6 +41,7 @@ export async function enhance(
   const base = `Today's date: ${today}\n\nAgent's request:\n"""${clean}"""`;
 
   let feedback = "";
+  let callOpts = opts;
   for (let attempt = 0; attempt < 2; attempt++) {
     let res;
     try {
@@ -54,11 +56,13 @@ export async function enhance(
           temperature: 0.2,
           maxOutputTokens: 2_000,
         },
-        opts,
+        callOpts,
       );
     } catch (err) {
       if (!isSchemaRejection(err)) throw err;
       feedback = schemaRejectionFeedback(err);
+      // The provider rejected its own JSON: give the one retry to the fallback model first.
+      callOpts = { ...opts, chain: retryChain(opts) };
       logger.warn({ attempt, feedback }, "brief rejected by structured-output schema");
       continue;
     }
