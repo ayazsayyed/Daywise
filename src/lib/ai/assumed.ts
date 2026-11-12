@@ -3,8 +3,9 @@ import type { Brief } from "./schemas";
 /**
  * The brief form (PNG 09) highlights `assumed` fields in amber. False positives
  * teach agents to ignore the highlight, so after the model answers we drop
- * anything the prompt plainly states, plus fields that are never a guess.
- * Conservative: when in doubt the field stays assumed.
+ * anything the prompt plainly states, plus fields that are never a guess, and
+ * add the core fields (nights, pax, budget, pace, start date) it plainly does
+ * not state. Conservative: when in doubt the field stays assumed.
  */
 const BRIEF_FIELDS = new Set([
   "destination",
@@ -32,6 +33,10 @@ const BUDGET =
 const PACE =
   /\b(relaxed|relax|chill|aaram|leisurely|slow|packed|fast|cover everything|balanced|easy pace)\b/i;
 
+/** Month names, dates, festivals, "next week" — anything that pins the start date. */
+const DATES =
+  /\b(jan(uary)?|feb(ruary)?|mar(ch)?|apr(il)?|may|june?|july?|aug(ust)?|sep(t|tember)?|oct(ober)?|nov(ember)?|dec(ember)?)\b|\b\d{1,2}(st|nd|rd|th)\b|\d{4}-\d{2}-\d{2}|\b\d{1,2}[/.-]\d{1,2}\b|\b(next|this) (week|month|weekend)\b|\b(christmas|diwali|holi|eid|new year|summer|winter) (break|holidays?|vacation|week)\b|\b(christmas|diwali|holi|new year)\b/i;
+
 export function reconcileAssumed(prompt: string, brief: Brief): string[] {
   const p = prompt.toLowerCase();
   const destinationStated = p.includes(brief.destination.toLowerCase());
@@ -45,6 +50,18 @@ export function reconcileAssumed(prompt: string, brief: Brief): string[] {
   };
 
   const out: string[] = [];
+  // The model under-reports too: core fields the prompt plainly does not state are assumed.
+  const core: [string, boolean][] = [
+    ["nights", stated.nights!],
+    ["pax", stated.pax!],
+    ["budget", stated.budget!],
+    ["pace", stated.pace!],
+    ["start_date", DATES.test(p)],
+  ];
+  const listed = brief.assumed.map((a) => a.trim().split(/[.[]/)[0]!);
+  for (const [field, isStated] of core) {
+    if (!isStated && !listed.includes(field)) out.push(field);
+  }
   for (const raw of brief.assumed) {
     // "pax.adults" → "pax"; ignore unknown names and fixed values (currency, notes).
     const field = raw.trim().split(/[.[]/)[0]!;

@@ -34,17 +34,25 @@ describe("assumed fields (#11)", () => {
       ...mockBrief(prompt, today),
       assumed: ["nights", "budget", "pax", "pax.adults"],
     };
-    expect(reconcileAssumed(prompt, brief)).toEqual(["nights", "budget"]);
+    expect(reconcileAssumed(prompt, brief).sort()).toEqual(
+      ["budget", "nights", "pace", "start_date"].sort(),
+    );
   });
 
   it("reads Hinglish and 5D4N shorthand", () => {
     const b = { ...mockBrief("kashmir", today), assumed: ["nights", "budget", "pace"] };
-    expect(reconcileAssumed("kashmir 5D4N sasta aaram se", b)).toEqual([]);
-    expect(reconcileAssumed("kashmir 5 din", b)).toEqual(["budget", "pace"]);
+    expect(reconcileAssumed("kashmir 5D4N couple sasta aaram se mid-March", b)).toEqual([]);
+    expect(reconcileAssumed("kashmir 5 din couple in March", b).sort()).toEqual(["budget", "pace"]);
   });
 
   it("family of 4 without ages keeps pax assumed (the adult/child split is a guess)", () => {
     const b = { ...mockBrief("Dubai 4 days family of 4", today), assumed: ["pax"] };
-    expect(reconcileAssumed("Dubai 4 days family of 4", b)).toEqual(["pax"]);
+    expect(reconcileAssumed("Dubai 4 days family of 4", b)).toContain("pax");
+  });
+
+  it("adds what the model forgot (Kerala run returned no assumed fields)", () => {
+    const prompt = "Kerala 6 days honeymoon";
+    const b = { ...mockBrief(prompt, today), assumed: [] };
+    expect(reconcileAssumed(prompt, b).sort()).toEqual(["budget", "pace", "start_date"]);
   });
 });
