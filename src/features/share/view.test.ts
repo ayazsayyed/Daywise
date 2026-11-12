@@ -12,6 +12,7 @@ import {
   initials,
   lines,
   paxLabel,
+  stockCredit,
 } from "./view";
 import { agentShareMessage, firstName, waDigits, waHref } from "./whatsapp";
 
@@ -184,6 +185,12 @@ describe("share view", () => {
     expect(v.days[0]!.hero!.credit).toBe("Photo: Op Singh · Google Maps");
   });
 
+  it("formats stock credits", () => {
+    expect(stockCredit("Photo by Suhail Lone on Pexels")).toBe("Suhail Lone / Pexels");
+    expect(stockCredit("Photo: Ravi K / Pexels")).toBe("Ravi K / Pexels");
+    expect(stockCredit(null)).toBeNull();
+  });
+
   it("splits free-text sections into items", () => {
     expect(v.sections.included).toEqual(["2 nights on twin sharing", "Breakfast every day"]);
     expect(lines("")).toEqual([]);
@@ -206,7 +213,7 @@ describe("price modes", () => {
   it("per person with breakdown", () => {
     const p = buildPrice(doc, 2)!;
     expect(p.amount).toBe("₹42,250");
-    expect(p.lines).toEqual([{ label: "2 people × ₹42,250", amount: "₹84,500" }]);
+    expect(p.lines).toEqual([{ label: "2 adults × ₹42,250", amount: "₹84,500" }]);
     expect(p.total).toBe("₹84,500");
     expect(p.bar).toEqual({ amount: "₹42,250", line: "per person · 2 adults" });
   });

@@ -170,14 +170,22 @@ export function lines(text: string): string[] {
     .filter(Boolean);
 }
 
+/** Stock credits as "<photographer> / Pexels" (deviation 2). */
+export function stockCredit(attribution: string | null | undefined): string | null {
+  const a = (attribution ?? "").trim();
+  if (!a) return null;
+  const m =
+    /^(?:photo(?::|\s+by)?\s+)?(.+?)\s+(?:on|\/|·)\s+(pexels|wikimedia(?: commons)?)$/i.exec(a);
+  if (m) return `${m[1]} / ${m[2]!.toLowerCase() === "pexels" ? "Pexels" : "Wikimedia Commons"}`;
+  return a.replace(/^Photo:\s*/i, "");
+}
+
 function image(img: EditorImage | null | undefined, caption: string): ShareImage | null {
   if (!img) return null;
   const google = img.source === "place";
   const credit = google
     ? `Photo: ${img.attribution ?? "Google Maps contributor"} · Google Maps`
-    : img.attribution
-      ? img.attribution
-      : null;
+    : stockCredit(img.attribution);
   return { url: img.url, caption, credit, google };
 }
 
@@ -228,7 +236,8 @@ export function buildPrice(
         amount: formatINR(s.headline.amount),
         unitLine: "per person",
         lines: s.lines.map((l) => ({
-          label: `${l.label} × ${formatINR(l.unit)}`,
+          // "2 adults × ₹42,250" when everyone is an adult (PNG 33), else "3 people × …".
+          label: `${pax.children ? l.label : who} × ${formatINR(l.unit)}`,
           amount: formatINR(l.amount),
         })),
         total: formatINR(s.total),
@@ -263,7 +272,7 @@ export function creditLine(images: (ShareImage | null)[]): string {
       anyGoogle = true;
       const name = img.credit?.replace(/^Photo: /, "").replace(/ · Google Maps$/, "");
       if (name && name !== "Google Maps contributor") google.add(name);
-    } else if (img.credit) other.add(img.credit.replace(/^Photo: /, ""));
+    } else if (img.credit) other.add(img.credit);
   }
   const parts: string[] = [];
   if (anyGoogle)

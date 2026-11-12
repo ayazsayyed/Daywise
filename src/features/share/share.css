@@ -1,0 +1,102 @@
+/*
+ * Client page print rules (DESIGN.md Part 2 "PDF", PNG 22 and 35–37).
+ * The PDF is this same page printed by Chromium (`/s/[token]?print=1`):
+ * A4 portrait, 15 mm margins, white paper, cover, then one day per page,
+ * then "Price and terms" with the footer. The running footer is a page
+ * margin box; its text is set per tenant by an inline <style> in print mode.
+ */
+
+@page {
+  size: A4 portrait;
+  margin: 15mm 15mm 18mm;
+}
+
+@media print {
+  html,
+  body {
+    background: #ffffff !important;
+    color: #1c1b19;
+    font-size: 10.5pt;
+  }
+
+  .share-root {
+    --color-paper: #ffffff;
+    --color-surface: #ffffff;
+    --color-ink: #1c1b19;
+    --color-ink-secondary: #5e5b55;
+    --color-ink-muted: #5e5b55;
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  [data-noprint] {
+    display: none !important;
+  }
+
+  .share-main,
+  .share-header {
+    max-width: none !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  /* Cover page holds everything up to the first day. */
+  .share-cover {
+    break-after: page;
+  }
+
+  /* One day per page; long days flow, hotel cards and stops never split. */
+  .share-day {
+    break-before: page;
+    margin-top: 0 !important;
+    border-top: 0 !important;
+    padding-top: 0 !important;
+  }
+  .share-day .share-day-hero {
+    width: 88%;
+  }
+  .share-stop,
+  .share-hotel,
+  .share-price,
+  .share-sections > div,
+  .share-footer,
+  figure.photo {
+    break-inside: avoid;
+  }
+  .share-day-head {
+    break-after: avoid;
+  }
+
+  .share-terms {
+    break-before: page;
+    margin-top: 0 !important;
+    border-top: 0 !important;
+    padding-top: 0 !important;
+  }
+  .share-footer {
+    break-before: avoid;
+    margin-top: 24pt !important;
+  }
+
+  /* Type: body 10.5pt, captions 9pt minimum. */
+  .share-root .share-stop-line,
+  .share-root .share-terms p,
+  .share-root .share-terms li {
+    font-size: 10.5pt !important;
+    line-height: 1.45 !important;
+  }
+  .share-root figcaption,
+  .share-root .share-caption {
+    font-size: 9pt !important;
+    line-height: 1.35 !important;
+  }
+
+  /* Tenant colour only on wordmark, cover rule and day numbers. */
+  .share-root .share-contacts a {
+    color: #1c1b19 !important;
+  }
+  .share-root a {
+    text-decoration: none !important;
+  }
+}
