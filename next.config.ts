@@ -21,7 +21,8 @@ const csp = [
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
-  ...(isDev ? [] : ["upgrade-insecure-requests"]),
+  // No upgrade-insecure-requests: HSTS (Caddy) already forces https for browsers, and the
+  // directive would break the worker's PDF render if INTERNAL_APP_URL is ever http://app:3000.
 ].join("; ");
 
 const securityHeaders = [
