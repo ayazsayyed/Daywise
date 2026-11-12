@@ -6,7 +6,9 @@ import { z } from "zod";
  * in), enumerated meal plans, and a money check on every free-text field.
  */
 
-export const BUDGET_TIERS = ["budget", "mid-range", "luxury"] as const;
+/** Matches the brief form (PNG 09): Budget / Mid-range / Premium / Luxury. */
+export const BUDGET_TIERS = ["budget", "mid-range", "premium", "luxury"] as const;
+export type BudgetTier = (typeof BUDGET_TIERS)[number];
 export const PACES = ["relaxed", "balanced", "packed"] as const;
 export const MEAL_PLANS = ["EP", "CP", "MAP", "AP"] as const;
 export const STOP_KINDS = ["sight", "activity", "meal", "transfer", "note"] as const;
@@ -67,6 +69,24 @@ export const briefSchema = z
 
 export type Brief = z.infer<typeof briefSchema>;
 
+/**
+ * Brief as stored on an itinerary (`itineraries.brief` carries extra keys:
+ * prompt, summary, draft_notes; Day 2 rows stored the draft notes array under
+ * `notes`). Returns the clean Brief, or null.
+ */
+export function parseStoredBrief(raw: unknown): Brief | null {
+  if (!raw || typeof raw !== "object") return null;
+  const {
+    prompt: _p,
+    summary: _s,
+    draft_notes: _d,
+    notes,
+    ...rest
+  } = raw as Record<string, unknown>;
+  const r = briefSchema.safeParse({ ...rest, notes: typeof notes === "string" ? notes : null });
+  return r.success ? r.data : null;
+}
+
 /** Dates derived from the brief: day N is start_date + (N-1). */
 export function briefDates(brief: Pick<Brief, "start_date" | "nights">): string[] | null {
   if (!brief.start_date) return null;
@@ -124,7 +144,8 @@ export const daySchema = z
     summary: cleanText(400),
     /** One line: "Private car Srinagar → Gulmarg, about 2 h". */
     transport: cleanText(200),
-    stops: z.array(stopSchema).min(1).max(10),
+    /** At least one stop per day; the departure day may be empty (checked in itinerarySchemaFor). */
+    stops: z.array(stopSchema).max(10),
     /** The hotel for this night. Null only on the final (departure) day. */
     hotel: hotelSchema.nullable(),
   })
@@ -134,7 +155,9 @@ export const itineraryDraftSchema = z
   .object({
     title: cleanText(80).refine((t) => t.length >= 4),
     summary: cleanText(500),
-    days: z.array(daySchema).min(1).max(31),
+    // No min/max here: Gemini rejects maxItems on this array ("invalid argument").
+    // The exact count (nights + 1, nights ≤ 30) is enforced by itinerarySchemaFor.
+    days: z.array(daySchema),
     /** Short practical notes, e.g. the weather disclaimer. No prices. */
     notes: z.array(cleanText(240)).max(8),
   })
@@ -166,6 +189,13 @@ export function itinerarySchemaFor(brief: Pick<Brief, "nights">) {
         });
       }
       const last = i === it.days.length - 1;
+      if (!last && d.stops.length === 0) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["days", i, "stops"],
+          message: `Day ${i + 1} needs at least one stop`,
+        });
+      }
       if (!last && !d.hotel) {
         ctx.addIssue({
           code: "custom",
@@ -181,6 +211,28 @@ export function itinerarySchemaFor(brief: Pick<Brief, "nights">) {
         });
       }
     });
+  });
+}
+
+/** One day (regenerate-day): the day must be number N, hotel per night, stops unless departure. */
+export function daySchemaFor(dayNumber: number, isLast: boolean) {
+  return daySchema.superRefine((d, ctx) => {
+    if (d.day_number !== dayNumber)
+      ctx.addIssue({ code: "custom", path: ["day_number"], message: `Must be day ${dayNumber}` });
+    if (!isLast && !d.hotel)
+      ctx.addIssue({
+        code: "custom",
+        path: ["hotel"],
+        message: "This day needs a hotel for the night",
+      });
+    if (isLast && d.hotel)
+      ctx.addIssue({
+        code: "custom",
+        path: ["hotel"],
+        message: "The departure day has no hotel night",
+      });
+    if (!isLast && d.stops.length === 0)
+      ctx.addIssue({ code: "custom", path: ["stops"], message: "Add at least one stop" });
   });
 }
 

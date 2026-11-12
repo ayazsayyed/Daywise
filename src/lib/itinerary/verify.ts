@@ -37,6 +37,8 @@ export type VerificationStats = {
   stops_total: number;
   budget_exhausted: boolean;
   places_calls: number;
+  /** Searches Places could not answer (no key, key restriction, network). */
+  places_failed: number;
 };
 
 export type VerifiedItinerary = Omit<DatedItinerary, "days"> & {
@@ -89,6 +91,7 @@ export async function verifyItinerary(
     stops_total: 0,
     budget_exhausted: false,
     places_calls: 0,
+    places_failed: 0,
   };
 
   // One bias per city, fetched up front (cached in places_queries).
@@ -118,6 +121,7 @@ export async function verifyItinerary(
     });
     if (!res.fromCache) stats.places_calls++;
     if (res.budgetExhausted) stats.budget_exhausted = true;
+    if (res.failed) stats.places_failed++;
     const match = res.places.find((p) => nameMatches(t.query, p.name)) ?? null;
     results.set(`${t.dayIdx}:${t.kind}:${t.idx}`, match);
   });

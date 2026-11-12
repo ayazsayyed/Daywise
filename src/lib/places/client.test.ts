@@ -53,4 +53,12 @@ describe("photo refs", () => {
     expect(decodePhotoRef(Buffer.from("https://evil.test/x").toString("base64url"))).toBeNull();
     expect(decodePhotoRef("not base64!!")).toBeNull();
   });
+
+  it("round-trips a real-length photo resource name (~460 chars)", () => {
+    const name = `places/ChIJR2iHaMKF4TgReVGZlZLvbb8/photos/${"AV-0GLdIalVsN_6oM6".repeat(24)}`;
+    expect(name.length).toBeGreaterThan(450);
+    const url = photoUrl(name, 800);
+    const ref = url.split("/api/photo/")[1]!.split("?")[0]!;
+    expect(decodePhotoRef(ref)).toBe(name);
+  });
 });

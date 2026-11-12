@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { mockBrief, mockItinerary } from "./mock";
 import {
   attachDates,
+  BUDGET_TIERS,
   briefDates,
   briefSchema,
   itinerarySchemaFor,
@@ -125,5 +126,61 @@ describe("system prompts", () => {
       expect(text).toMatch(/availability/i);
       expect(text).toMatch(/star ratings/i);
     }
+  });
+});
+
+describe("budget tiers (#8)", () => {
+  it("has the four tiers of the brief form", () => {
+    expect(BUDGET_TIERS).toEqual(["budget", "mid-range", "premium", "luxury"]);
+    expect(briefSchema.safeParse({ ...brief, budget: "premium" }).success).toBe(true);
+    expect(briefSchema.safeParse({ ...brief, budget: "4-star" }).success).toBe(false);
+  });
+
+  it("maps shorthand to the right tier", () => {
+    const d = new Date("2026-11-08T00:00:00Z");
+    expect(mockBrief("Kerala 6 days premium", d).budget).toBe("premium");
+    expect(mockBrief("Kerala 6 days 4 star", d).budget).toBe("premium");
+    expect(mockBrief("Kerala 6 days luxury", d).budget).toBe("luxury");
+  });
+
+  it("the enhancer and itinerary prompts know all four tiers", () => {
+    for (const tier of BUDGET_TIERS) {
+      expect(systemPrompt("enhancer")).toContain(`\`${tier}\``);
+      expect(systemPrompt("itinerary")).toContain(`\`${tier}\``);
+    }
+  });
+});
+
+describe("departure day stops (#10)", () => {
+  const schema = itinerarySchemaFor(brief);
+
+  it("allows an empty departure day", () => {
+    const it = structuredClone(golden);
+    it.days[4]!.stops = [];
+    expect(schema.safeParse(it).success).toBe(true);
+  });
+
+  it("still requires a stop on every other day", () => {
+    const it = structuredClone(golden);
+    it.days[2]!.stops = [];
+    const r = schema.safeParse(it);
+    expect(r.success).toBe(false);
+    expect(JSON.stringify(r.error?.issues)).toMatch(/Day 3 needs at least one stop/);
+  });
+
+  it("the prompt tells the model the departure day has the transfer stop", () => {
+    expect(systemPrompt("itinerary")).toMatch(/departure day always has at least one stop/);
+  });
+});
+
+describe("provider-facing JSON schema", () => {
+  it("has no maxItems/minItems on days (Gemini rejects it with 'invalid argument')", async () => {
+    const { toJSONSchema } = await import("zod");
+    const { itineraryDraftSchema } = await import("./schemas");
+    const js = toJSONSchema(itineraryDraftSchema) as unknown as {
+      properties: { days: { maxItems?: number; minItems?: number } };
+    };
+    expect(js.properties.days.maxItems).toBeUndefined();
+    expect(js.properties.days.minItems).toBeUndefined();
   });
 });

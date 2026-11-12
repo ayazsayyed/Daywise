@@ -1,9 +1,16 @@
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 
+import { reconcileAssumed } from "./assumed";
 import { mockBrief } from "./mock";
 import { systemPrompt } from "./prompts";
-import { callStructured, type CallOptions } from "./providers";
+import {
+  callStructured,
+  isSchemaRejection,
+  retryChain,
+  schemaRejectionFeedback,
+  type CallOptions,
+} from "./providers";
 import { briefSchema, describeIssues, type Brief } from "./schemas";
 
 export class BriefError extends Error {
@@ -25,28 +32,42 @@ export async function enhance(
   const clean = prompt.trim().replace(/\s+/g, " ").slice(0, 1_000);
   if (clean.length < 4) throw new BriefError("Describe the trip in a few words first.");
 
-  if (env.MOCK_AI === "1") return briefSchema.parse(mockBrief(clean, opts.today));
+  const finish = (b: Brief): Brief => ({ ...b, assumed: reconcileAssumed(clean, b) });
+
+  if (env.MOCK_AI === "1" && !opts.runner)
+    return finish(briefSchema.parse(mockBrief(clean, opts.today)));
 
   const today = (opts.today ?? new Date()).toISOString().slice(0, 10);
   const base = `Today's date: ${today}\n\nAgent's request:\n"""${clean}"""`;
 
   let feedback = "";
+  let callOpts = opts;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await callStructured(
-      {
-        op: "enhance",
-        schema: briefSchema,
-        system: systemPrompt("enhancer"),
-        prompt: feedback
-          ? `${base}\n\nYour previous answer had problems:\n${feedback}\nFix them.`
-          : base,
-        temperature: 0.2,
-        maxOutputTokens: 2_000,
-      },
-      opts,
-    );
+    let res;
+    try {
+      res = await callStructured(
+        {
+          op: "enhance",
+          schema: briefSchema,
+          system: systemPrompt("enhancer"),
+          prompt: feedback
+            ? `${base}\n\nYour previous answer had problems:\n${feedback}\nFix them.`
+            : base,
+          temperature: 0.2,
+          maxOutputTokens: 2_000,
+        },
+        callOpts,
+      );
+    } catch (err) {
+      if (!isSchemaRejection(err)) throw err;
+      feedback = schemaRejectionFeedback(err);
+      // The provider rejected its own JSON: give the one retry to the fallback model first.
+      callOpts = { ...opts, chain: retryChain(opts) };
+      logger.warn({ attempt, feedback }, "brief rejected by structured-output schema");
+      continue;
+    }
     const parsed = briefSchema.safeParse(res.object);
-    if (parsed.success) return parsed.data;
+    if (parsed.success) return finish(parsed.data);
     feedback = describeIssues(parsed.error);
     logger.warn({ attempt, feedback }, "brief failed validation");
   }

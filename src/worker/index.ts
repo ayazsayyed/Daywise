@@ -4,6 +4,7 @@ import { getBoss, QUEUES, type GenerateJobData } from "@/lib/jobs/boss";
 import { logger as base } from "@/lib/logger";
 
 import { handleGenerate } from "./jobs/generate";
+import { handleRegenerateDay } from "./jobs/regenerate-day";
 
 /**
  * Background worker: pg-boss queues from the same codebase, separate process.
@@ -21,6 +22,15 @@ async function main() {
       if (!job) return;
       logger.info({ id: job.id, data: job.data }, "generate-itinerary start");
       await handleGenerate(job.data);
+    },
+  );
+  await boss.work<GenerateJobData>(
+    QUEUES.regenerateDay,
+    { batchSize: 1, pollingIntervalSeconds: 1 },
+    async ([job]) => {
+      if (!job) return;
+      logger.info({ id: job.id, data: job.data }, "regenerate-day start");
+      await handleRegenerateDay(job.data);
     },
   );
   logger.info({ queues: Object.values(QUEUES) }, "worker started");

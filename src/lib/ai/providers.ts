@@ -1,7 +1,15 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createGroq } from "@ai-sdk/groq";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { APICallError, generateObject, type LanguageModel } from "ai";
+import {
+  APICallError,
+  generateObject,
+  JSONParseError,
+  NoObjectGeneratedError,
+  RetryError,
+  TypeValidationError,
+  type LanguageModel,
+} from "ai";
 import type { z } from "zod";
 
 import { env } from "@/lib/env";
@@ -33,6 +41,8 @@ export type StructuredCall<T> = {
   prompt: string;
   temperature?: number;
   maxOutputTokens?: number;
+  /** Set per provider by `callStructured` (e.g. Groq reasoning effort). */
+  providerOptions?: Record<string, Record<string, string>>;
 };
 
 export type Runner = <T>(
@@ -48,12 +58,23 @@ export type StructuredResult<T> = {
 
 const DEFAULT_TIMEOUT_MS = 90_000;
 
-function modelFor(name: ProviderName): { model: LanguageModel; id: string } {
+type ResolvedModel = {
+  model: LanguageModel;
+  id: string;
+  providerOptions?: Record<string, Record<string, string>>;
+};
+
+function modelFor(name: ProviderName): ResolvedModel {
   switch (name) {
     case "groq": {
       if (!env.GROQ_API_KEY) throw new ProviderNotConfigured("groq");
       const groq = createGroq({ apiKey: env.GROQ_API_KEY });
-      return { model: groq(env.GROQ_MODEL), id: env.GROQ_MODEL };
+      return {
+        model: groq(env.GROQ_MODEL),
+        id: env.GROQ_MODEL,
+        // gpt-oss reasons before answering; an itinerary needs little of it and "low" is much faster.
+        providerOptions: { groq: { reasoningEffort: env.GROQ_REASONING_EFFORT } },
+      };
     }
     case "gemini": {
       if (!env.GEMINI_API_KEY) throw new ProviderNotConfigured("gemini");
@@ -99,19 +120,64 @@ export class AIUnavailableError extends Error {
   }
 }
 
+/** The AI SDK wraps its own retries in RetryError; judge the last underlying error. */
+export function unwrapError(err: unknown): unknown {
+  return RetryError.isInstance(err) ? (err.lastError ?? err) : err;
+}
+
 /** True for the failures that justify trying the next provider. */
-export function shouldFallback(err: unknown): boolean {
+export function shouldFallback(e: unknown): boolean {
+  const err = unwrapError(e);
   if (err instanceof ProviderNotConfigured) return true;
   if (err instanceof Error && (err.name === "AbortError" || err.name === "TimeoutError"))
     return true;
   if (APICallError.isInstance(err)) {
     const s = err.statusCode;
     if (s === 429 || (s !== undefined && s >= 500)) return true;
+    // Bad or revoked key / no access to the model: this provider cannot answer, the next one may.
+    if (s === 401 || s === 403) return true;
     if (s === undefined) return true; // network / DNS / reset
     return err.isRetryable;
   }
   const code = (err as { code?: string })?.code;
   return ["ECONNRESET", "ECONNREFUSED", "ETIMEDOUT", "ENOTFOUND", "EAI_AGAIN"].includes(code ?? "");
+}
+
+/**
+ * True when the model answered but its JSON was rejected — by the SDK's own
+ * zod check (NoObjectGeneratedError / TypeValidationError / JSONParseError) or
+ * by the provider's structured-output validator (Groq: 400 "Generated JSON does
+ * not match the expected schema"). Callers retry once with this message as
+ * feedback; it is not a reason to switch providers.
+ */
+export function isSchemaRejection(e: unknown): boolean {
+  const err = unwrapError(e);
+  if (
+    NoObjectGeneratedError.isInstance(err) ||
+    TypeValidationError.isInstance(err) ||
+    JSONParseError.isInstance(err)
+  )
+    return true;
+  if (APICallError.isInstance(err) && err.statusCode === 400) {
+    const text = `${err.message} ${err.responseBody ?? ""}`;
+    return /does not match the expected schema|json_validate_failed|failed to (generate|validate) json|schema/i.test(
+      text,
+    );
+  }
+  return false;
+}
+
+/** Short, model-readable reason for a schema rejection (used as retry feedback). */
+export function schemaRejectionFeedback(e: unknown): string {
+  const err = unwrapError(e);
+  if (TypeValidationError.isInstance(err) || NoObjectGeneratedError.isInstance(err)) {
+    const cause = (err as { cause?: unknown }).cause;
+    const msg = cause instanceof Error ? cause.message : (err as Error).message;
+    return msg.slice(0, 1_500);
+  }
+  if (APICallError.isInstance(err))
+    return `${err.message} ${err.responseBody ?? ""}`.slice(0, 1_500);
+  return err instanceof Error ? err.message.slice(0, 1_500) : String(err).slice(0, 1_500);
 }
 
 /** Default runner: Vercel AI SDK `generateObject`. */
@@ -123,6 +189,7 @@ export const sdkRunner: Runner = async (model, call) => {
     prompt: call.prompt,
     temperature: call.temperature ?? 0.4,
     maxOutputTokens: call.maxOutputTokens ?? 8_000,
+    ...(call.providerOptions ? { providerOptions: call.providerOptions } : {}),
     abortSignal: AbortSignal.timeout(env.AI_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS),
   });
   return {
@@ -138,7 +205,7 @@ export type CallOptions = {
   onUsage?: (u: UsageReport) => void | Promise<void>;
   /** Injected for tests. */
   runner?: Runner;
-  resolveModel?: (name: ProviderName) => { model: LanguageModel; id: string };
+  resolveModel?: (name: ProviderName) => ResolvedModel;
 };
 
 /**
@@ -159,9 +226,9 @@ export async function callStructured<T>(
     const started = Date.now();
     let id = name;
     try {
-      const { model, id: modelId } = resolve(name);
+      const { model, id: modelId, providerOptions } = resolve(name);
       id = modelId as ProviderName;
-      const res = await runner(model, call);
+      const res = await runner(model, providerOptions ? { ...call, providerOptions } : call);
       await opts.onUsage?.({
         provider: name,
         model: modelId,
@@ -201,11 +268,21 @@ export async function callStructured<T>(
   );
 }
 
+/**
+ * Chain for the one retry after the provider itself rejected its JSON: ask the
+ * fallback first (a different model is likelier to succeed), then the primary.
+ */
+export function retryChain(opts: CallOptions): ProviderName[] {
+  if (opts.chain) return opts.chain;
+  return dedupe([env.AI_FALLBACK_PROVIDER, env.AI_PROVIDER]);
+}
+
 function dedupe<T>(xs: T[]): T[] {
   return xs.filter((x, i) => xs.indexOf(x) === i);
 }
 
-export function errorSummary(err: unknown): string {
+export function errorSummary(e: unknown): string {
+  const err = unwrapError(e);
   if (APICallError.isInstance(err))
     return `${err.statusCode ?? "net"} ${err.message.slice(0, 200)}`;
   if (err instanceof Error) return `${err.name}: ${err.message.slice(0, 200)}`;

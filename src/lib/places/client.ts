@@ -43,10 +43,13 @@ export type TextSearchResult = {
   /** True when the budget guard refused the call (nothing was searched). */
   budgetExhausted: boolean;
   fromCache: boolean;
+  /** Places could not answer (no key, HTTP error, network). Distinct from budget. */
+  failed?: "no_key" | "http" | "network";
 };
 
-export function normaliseQuery(q: string, bias?: LocationBias): string {
-  const base = q.toLowerCase().replace(/\s+/g, " ").trim();
+export function normaliseQuery(q: string, bias?: LocationBias, includedType?: string): string {
+  let base = q.toLowerCase().replace(/\s+/g, " ").trim();
+  if (includedType) base = `${base} #${includedType}`;
   if (!bias) return base;
   return `${base} @${bias.lat.toFixed(2)},${bias.lng.toFixed(2)}`;
 }
@@ -87,28 +90,54 @@ export function parsePlace(raw: RawPlace): PlaceResult | null {
   };
 }
 
-function mockPlaces(query: string): PlaceResult[] {
+/** MOCK_AI places: kept in memory so `cachedPlace` can resolve what `textSearch` returned. */
+const mockCache = new Map<string, PlaceResult>();
+
+function mockPlaces(query: string, includedType?: string): PlaceResult[] {
   const name = query.split(",")[0]!.trim();
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-  return [
-    {
-      id: `mock-${slug}`,
-      name,
-      address: `${query.split(",").slice(1).join(",").trim() || "India"}`,
+  const area = query.split(",").slice(1).join(",").trim() || "India";
+  const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const names =
+    includedType === "lodging"
+      ? [
+          `${name} Grand Hotel`,
+          `${name} Residency`,
+          `Hotel ${name} Heights`,
+          `${name} Retreat`,
+          `The ${name} House`,
+        ]
+      : [name];
+  return names.map((n) => {
+    const p: PlaceResult = {
+      id: `mock-${slug(n)}`,
+      name: n,
+      address: area,
       location: { lat: 34.08, lng: 74.8 },
       photos: [],
-    },
-  ];
+    };
+    mockCache.set(p.id, p);
+    return p;
+  });
 }
 
 export async function textSearch(
   query: string,
-  opts: { bias?: LocationBias; tenantId?: string | null; max?: number } = {},
+  opts: {
+    bias?: LocationBias;
+    tenantId?: string | null;
+    max?: number;
+    /** Places type filter, e.g. "lodging" for the hotel swap search. A body parameter: no re-pricing. */
+    includedType?: string;
+  } = {},
 ): Promise<TextSearchResult> {
-  const key = normaliseQuery(query, opts.bias);
+  const key = normaliseQuery(query, opts.bias, opts.includedType);
 
   if (env.MOCK_AI === "1")
-    return { places: mockPlaces(query), budgetExhausted: false, fromCache: false };
+    return {
+      places: mockPlaces(query, opts.includedType).slice(0, opts.max ?? 5),
+      budgetExhausted: false,
+      fromCache: false,
+    };
 
   const cached = await db.query.placesQueries.findFirst({
     where: eq(schema.placesQueries.query, key),
@@ -122,7 +151,7 @@ export async function textSearch(
 
   if (!env.GOOGLE_PLACES_API_KEY) {
     logger.warn("GOOGLE_PLACES_API_KEY missing; skipping verification");
-    return { places: [], budgetExhausted: true, fromCache: false };
+    return { places: [], budgetExhausted: false, fromCache: false, failed: "no_key" };
   }
 
   const allowed = await placesBudget().spend("places_search", opts.tenantId ?? null);
@@ -133,6 +162,7 @@ export async function textSearch(
     pageSize: Math.min(opts.max ?? 5, 10),
     languageCode: "en",
   };
+  if (opts.includedType) body.includedType = opts.includedType;
   if (opts.bias) {
     body.locationBias = {
       circle: {
@@ -159,13 +189,13 @@ export async function textSearch(
         { status: res.status, query, text: (await res.text()).slice(0, 300) },
         "Places error",
       );
-      return { places: [], budgetExhausted: false, fromCache: false };
+      return { places: [], budgetExhausted: false, fromCache: false, failed: "http" };
     }
     const json = (await res.json()) as { places?: RawPlace[] };
     raw = json.places ?? [];
   } catch (err) {
     logger.error({ err, query }, "Places request failed");
-    return { places: [], budgetExhausted: false, fromCache: false };
+    return { places: [], budgetExhausted: false, fromCache: false, failed: "network" };
   }
 
   const places = raw.map(parsePlace).filter((p): p is PlaceResult => !!p);
@@ -202,6 +232,7 @@ export async function geocodeCity(
 
 /** Cached place payload by id (for the photo proxy's attribution header). */
 export async function cachedPlace(placeId: string): Promise<PlaceResult | null> {
+  if (env.MOCK_AI === "1") return mockCache.get(placeId) ?? null;
   const row = await db.query.placesCache.findFirst({
     where: eq(schema.placesCache.placeId, placeId),
   });

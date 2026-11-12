@@ -46,10 +46,11 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ ref: string
   if (!allowed) return fallback();
 
   try {
-    const meta = await fetch(
-      `${MEDIA}/${name}/media?maxWidthPx=${width}&skipHttpRedirect=true&key=${env.GOOGLE_PLACES_API_KEY}`,
-      { signal: AbortSignal.timeout(10_000) },
-    );
+    // Key in a header, never in the URL (keeps it out of logs and proxies).
+    const meta = await fetch(`${MEDIA}/${name}/media?maxWidthPx=${width}&skipHttpRedirect=true`, {
+      headers: { "X-Goog-Api-Key": env.GOOGLE_PLACES_API_KEY },
+      signal: AbortSignal.timeout(10_000),
+    });
     if (!meta.ok) {
       logger.warn({ status: meta.status, name }, "photo media lookup failed");
       return fallback();

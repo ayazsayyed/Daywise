@@ -68,7 +68,7 @@ export type ItineraryClient = {
   /** DESIGN.md deviation 7. */
   city?: string;
   referred_by?: string;
-  pax: { adults: number; children: number; child_ages: number[] };
+  pax: { adults: number; children: number; child_ages: number[]; infants?: number };
 };
 
 export type ItineraryPricing = {
@@ -79,6 +79,8 @@ export type ItineraryPricing = {
   per_adult: number | null;
   per_child: number | null;
   currency: string;
+  /** Free text under the total, e.g. "Includes 5% GST" (DESIGN.md deviation 2). No maths. */
+  tax_note?: string;
 };
 
 export type ItinerarySections = {
@@ -190,6 +192,7 @@ export const days = pgTable(
       .references(() => itineraries.id, { onDelete: "cascade" }),
     position: integer("position").notNull(),
     date: date("date"),
+    city: text("city"),
     title: text("title").notNull(),
     summary: text("summary"),
     transport: text("transport"),
@@ -210,6 +213,8 @@ export const stops = pgTable(
     kind: stopKindEnum("kind").notNull().default("sight"),
     title: text("title").notNull(),
     description: text("description"),
+    /** "HH:MM" 24h, or null when flexible. */
+    time: text("time"),
     duration: text("duration"),
     placeId: text("place_id"),
     verified: boolean("verified").notNull().default(false),
@@ -227,6 +232,7 @@ export const hotels = pgTable(
       .notNull()
       .references(() => days.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    city: text("city"),
     placeId: text("place_id"),
     verified: boolean("verified").notNull().default(false),
     roomType: text("room_type"),
@@ -332,8 +338,13 @@ export const generationJobs = pgTable(
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
     itineraryId: uuid("itinerary_id").references(() => itineraries.id, { onDelete: "set null" }),
+    /** "itinerary" (full generation) or "day" (regenerate one day of `itinerary_id`). */
+    kind: text("kind").notNull().default("itinerary"),
+    dayId: uuid("day_id"),
     prompt: text("prompt").notNull(),
     brief: jsonb("brief").$type<Record<string, unknown>>(),
+    /** Client entered on the brief step; copied to the itinerary when it is created. */
+    client: jsonb("client").$type<ItineraryClient>(),
     status: generationStatusEnum("status").notNull().default("queued"),
     progress: jsonb("progress").$type<GenerationProgress>().notNull().default({ steps: [] }),
     error: text("error"),

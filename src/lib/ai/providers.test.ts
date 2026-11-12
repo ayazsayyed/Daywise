@@ -49,6 +49,22 @@ describe("provider fallback", () => {
     ]);
   });
 
+  it("falls back on a bad or unauthorised key (401/403)", async () => {
+    expect(shouldFallback(apiError(401))).toBe(true);
+    expect(shouldFallback(apiError(403))).toBe(true);
+    expect(shouldFallback(apiError(400))).toBe(false);
+    const runner: Runner = vi.fn(async (model: { modelId?: string }) => {
+      if (model.modelId === "groq") throw apiError(401);
+      return { object: { ok: true }, tokensIn: 1, tokensOut: 1 };
+    }) as unknown as Runner;
+    const res = await callStructured(call, {
+      chain: ["groq", "gemini"],
+      runner,
+      resolveModel: fakeModel,
+    });
+    expect(res.provider).toBe("gemini");
+  });
+
   it("falls back on 5xx, timeouts and network errors", () => {
     expect(shouldFallback(apiError(503))).toBe(true);
     expect(shouldFallback(apiError(undefined))).toBe(true);
@@ -58,13 +74,15 @@ describe("provider fallback", () => {
     expect(shouldFallback(Object.assign(new Error("x"), { code: "ECONNRESET" }))).toBe(true);
   });
 
-  it("does not fall back on a 400/401 — that is our bug or key, not capacity", async () => {
+  // A 400 is our request's fault and would fail the same way everywhere. (401/403 do fall
+  // back: Day 2 acceptance requires a bad Groq key to land on Gemini.)
+  it("does not fall back on a 400 — that is our bug, not capacity", async () => {
     const runner: Runner = vi.fn(async () => {
-      throw apiError(401);
+      throw apiError(400);
     }) as unknown as Runner;
     await expect(
       callStructured(call, { chain: ["groq", "gemini"], runner, resolveModel: fakeModel }),
-    ).rejects.toMatchObject({ statusCode: 401 });
+    ).rejects.toMatchObject({ statusCode: 400 });
     expect(runner).toHaveBeenCalledTimes(1);
   });
 

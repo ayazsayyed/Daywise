@@ -27,3 +27,15 @@ describe("format", () => {
     );
   });
 });
+
+describe("editor date labels", () => {
+  it("formats weekday ranges and clock times", async () => {
+    const { formatWeekdayRange, formatWeekdayDate, formatClock } = await import("./format");
+    expect(formatWeekdayRange("2027-03-14", "2027-03-18")).toBe("Sun 14 – Thu 18 Mar 2027");
+    expect(formatWeekdayRange("2027-02-27", "2027-03-03")).toBe("Sat 27 Feb – Wed 3 Mar 2027");
+    expect(formatWeekdayDate("2027-03-15")).toBe("Mon 15 Mar");
+    expect(formatClock("12:30")).toBe("12:30 pm");
+    expect(formatClock("00:05")).toBe("12:05 am");
+    expect(formatClock("08:00")).toBe("8:00 am");
+  });
+});
