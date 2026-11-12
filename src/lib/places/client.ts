@@ -159,7 +159,7 @@ export async function textSearch(
 
   const body: Record<string, unknown> = {
     textQuery: query,
-    pageSize: Math.min(opts.max ?? 5, 10),
+    pageSize: Math.min(opts.max ?? 5, 20),
     languageCode: "en",
   };
   if (opts.includedType) body.includedType = opts.includedType;

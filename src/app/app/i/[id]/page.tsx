@@ -19,5 +19,11 @@ export default async function EditorPage({ params }: { params: Promise<{ id: str
     if (err instanceof NotFoundError) notFound();
     throw err;
   });
-  return <Editor initial={toEditorDoc(tree)} defaults={session.tenant.defaults} />;
+  return (
+    <Editor
+      initial={toEditorDoc(tree)}
+      defaults={session.tenant.defaults}
+      agencyName={session.tenant.name}
+    />
+  );
 }

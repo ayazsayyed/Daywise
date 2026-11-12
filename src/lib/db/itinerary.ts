@@ -1,5 +1,7 @@
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 
+import { type LearningCandidate, shouldRecordLearning } from "@/lib/ai/learning-policy";
+import { env } from "@/lib/env";
 import type { VerifiedDay } from "@/lib/itinerary/verify";
 import { addDays, checkOpRefs, type EditorOp } from "@/lib/itinerary/doc";
 
@@ -111,12 +113,29 @@ export function itineraryRepo(tenantId: string, conn: Db) {
   async function learn(
     tx: Tx,
     it: typeof schema.itineraries.$inferSelect,
-    kind: string,
+    candidate: LearningCandidate,
     payload: Record<string, unknown>,
   ) {
+    if (!shouldRecordLearning(candidate, { mockAi: env.MOCK_AI === "1" })) return;
+    const kind = candidate.kind;
     const destination = String((it.brief as { destination?: string } | null)?.destination ?? "");
     if (!destination) return;
     await tx.insert(schema.tenantLearnings).values({ tenantId, destination, kind, payload });
+  }
+
+  async function ensureShareLink(itineraryId: string, mintToken: () => string) {
+    const it = await own(conn, itineraryId);
+    if (it.isTemplate) throw new InvalidEditError("Templates cannot be shared");
+    const existing = await conn.query.shareLinks.findFirst({
+      where: eq(schema.shareLinks.itineraryId, it.id),
+      orderBy: [desc(schema.shareLinks.createdAt)],
+    });
+    if (existing) return existing;
+    const [row] = await conn
+      .insert(schema.shareLinks)
+      .values({ itineraryId: it.id, token: mintToken(), enabled: true })
+      .returning();
+    return row!;
   }
 
   return {
@@ -262,10 +281,15 @@ export function itineraryRepo(tenantId: string, conn: Db) {
               await writeStopOrder(tx, op.dayId, order);
               stopDay.set(op.stopId, op.dayId);
               if (op.title.trim().length >= 3)
-                await learn(tx, it, "stop_added", {
-                  title: op.title.trim(),
-                  city: cityOf.get(op.dayId) ?? "",
-                });
+                await learn(
+                  tx,
+                  it,
+                  { kind: "stop_added" },
+                  {
+                    title: op.title.trim(),
+                    city: cityOf.get(op.dayId) ?? "",
+                  },
+                );
               break;
             }
             case "stop.remove":
@@ -322,11 +346,16 @@ export function itineraryRepo(tenantId: string, conn: Db) {
                 checkIn: prev?.checkIn ?? "14:00",
                 checkOut: prev?.checkOut ?? "11:00",
               });
-              await learn(tx, it, "hotel_swap", {
-                from: prev?.name ?? "",
-                to: data.name,
-                city: cityOf.get(op.dayId) ?? "",
-              });
+              await learn(
+                tx,
+                it,
+                { kind: "hotel_swap", placeId: op.placeId },
+                {
+                  from: prev?.name ?? "",
+                  to: data.name,
+                  city: cityOf.get(op.dayId) ?? "",
+                },
+              );
               break;
             }
             case "hotel.remove":
@@ -483,6 +512,42 @@ export function itineraryRepo(tenantId: string, conn: Db) {
           .set({ updatedAt: new Date() })
           .where(eq(schema.itineraries.id, it.id));
       });
+    },
+
+    // ── Sharing (Day 4). Tokens are minted here; the public page resolves by token only. ──
+
+    /** The itinerary's share link (newest), or null before the first share. */
+    async getShareLink(itineraryId: string) {
+      const it = await own(conn, itineraryId);
+      const row = await conn.query.shareLinks.findFirst({
+        where: eq(schema.shareLinks.itineraryId, it.id),
+        orderBy: [desc(schema.shareLinks.createdAt)],
+      });
+      return row ?? null;
+    },
+
+    /** Returns the link, creating an enabled one on first use. Templates cannot be shared. */
+    ensureShareLink,
+
+    async setShareEnabled(itineraryId: string, enabled: boolean, mintToken: () => string) {
+      const link = await ensureShareLink(itineraryId, mintToken);
+      const [row] = await conn
+        .update(schema.shareLinks)
+        .set({ enabled, updatedAt: new Date() })
+        .where(eq(schema.shareLinks.id, link.id))
+        .returning();
+      return row!;
+    },
+
+    /** First share (copy, WhatsApp, PDF) moves a draft to Sent. Returns the new status. */
+    async markShared(itineraryId: string) {
+      const it = await own(conn, itineraryId);
+      if (it.status !== "draft") return it.status;
+      await conn
+        .update(schema.itineraries)
+        .set({ status: "sent" })
+        .where(eq(schema.itineraries.id, it.id));
+      return "sent" as const;
     },
   };
 }

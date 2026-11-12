@@ -62,6 +62,9 @@ import {
   regenerateDay,
   saveAsTemplate,
 } from "./actions";
+import { openShare } from "@/features/share/actions";
+import { SharePanel } from "@/features/share/share-panel";
+
 import { DaySection, StopContent } from "./day-section";
 import { InlineText } from "./inline";
 import { SidePanel } from "./side-panel";
@@ -75,7 +78,15 @@ const BUDGET_WORD: Record<string, string> = {
   luxury: "Luxury",
 };
 
-export function Editor({ initial, defaults }: { initial: EditorDoc; defaults: EditorSections }) {
+export function Editor({
+  initial,
+  defaults,
+  agencyName,
+}: {
+  initial: EditorDoc;
+  defaults: EditorSections;
+  agencyName: string;
+}) {
   const { doc, status, dispatch, flush, replaceDay, preview, retry } = useEditor(initial);
   const [tab, setTab] = useState<"days" | "details">("days");
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
@@ -83,6 +94,7 @@ export function Editor({ initial, defaults }: { initial: EditorDoc; defaults: Ed
   const [regenErr, setRegenErr] = useState<Record<string, string>>({});
   const [confirmDay, setConfirmDay] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [pendingNav, startNav] = useTransition();
 
   const docRef = useRef(doc);
@@ -230,8 +242,42 @@ export function Editor({ initial, defaults }: { initial: EditorDoc; defaults: Ed
         onDuplicate={() => startNav(() => flush().then(() => duplicateItinerary(doc.id)))}
         onTemplate={() => startNav(() => flush().then(() => saveAsTemplate(doc.id)))}
         onDelete={() => setConfirmDelete(true)}
+        onShare={() => void flush().then(() => setShareOpen(true))}
+        onPreview={() =>
+          void flush()
+            .then(() => openShare(doc.id))
+            .then((r) => r.ok && window.open(r.data.url, "_blank", "noopener"))
+        }
         busy={pendingNav}
       />
+      {!doc.isTemplate && (
+        <SharePanel
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+          agencyName={agencyName}
+          target={{
+            id: doc.id,
+            title: doc.title,
+            status: doc.status,
+            destination: doc.destination,
+            clientName: doc.client?.name ?? "",
+            clientPhone: doc.client?.phone ?? "",
+            dayCount: doc.days.length,
+            unverified: doc.days.flatMap((d, i) =>
+              d.hotel && !d.hotel.verified
+                ? [{ label: `Night ${i + 1}, ${d.city || d.hotel.name}`, anchor: `day-${d.id}` }]
+                : [],
+            ),
+          }}
+          onStatus={(s) => dispatch({ op: "itinerary.set", status: s })}
+          onShared={() => {
+            if (doc.status === "draft") dispatch({ op: "itinerary.set", status: "sent" });
+          }}
+          onJump={(anchor) =>
+            document.getElementById(anchor)?.scrollIntoView({ behavior: "smooth", block: "start" })
+          }
+        />
+      )}
 
       <div className="border-line bg-surface sticky top-14 z-20 border-b px-4 py-2 lg:hidden">
         <SegmentedControl
@@ -403,6 +449,8 @@ function EditorBar({
   onDuplicate,
   onTemplate,
   onDelete,
+  onShare,
+  onPreview,
   busy,
 }: {
   doc: EditorDoc;
@@ -412,6 +460,8 @@ function EditorBar({
   onDuplicate: () => void;
   onTemplate: () => void;
   onDelete: () => void;
+  onShare: () => void;
+  onPreview: () => void;
   busy: boolean;
 }) {
   const more = (
@@ -496,8 +546,9 @@ function EditorBar({
           <Button
             variant="ghost"
             size="sm"
-            disabled
-            title="The client page arrives on Day 4"
+            onClick={onPreview}
+            disabled={doc.isTemplate}
+            title={doc.isTemplate ? "Templates have no client page" : "Open the client page"}
             className="hidden md:inline-flex"
           >
             <Eye aria-hidden /> Preview
@@ -509,7 +560,7 @@ function EditorBar({
               </Button>
             </form>
           ) : (
-            <Button size="sm" className="h-9 px-4" disabled title="Sharing arrives on Day 4">
+            <Button size="sm" className="h-9 px-4" onClick={onShare}>
               Share
             </Button>
           )}

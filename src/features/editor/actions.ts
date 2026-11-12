@@ -10,7 +10,9 @@ import { placePhotoImage } from "@/lib/images/resolve";
 import type { EditorDay, EditorImage } from "@/lib/itinerary/doc";
 import { opsPayloadSchema } from "@/lib/itinerary/doc";
 import { logger } from "@/lib/logger";
-import { cachedPlace, geocodeCity, textSearch } from "@/lib/places/client";
+import { parseStoredBrief } from "@/lib/ai/schemas";
+import { cachedPlace, geocodeCity, textSearch, type PlaceResult } from "@/lib/places/client";
+import { cityKey, filterCandidates, hotelCandidates } from "@/lib/places/hotels";
 import { enqueueRegenerateDay, getGenerationJob } from "@/features/itinerary/jobs";
 
 import { toEditorDoc, toEditorImage } from "./load";
@@ -76,6 +78,29 @@ export async function searchHotels(
   if (!tree) return { results: [], error: "Itinerary not found" };
   const country = String((tree.brief as { country?: string } | null)?.country ?? "");
   const cleanCity = city.trim().slice(0, 60);
+  const toResult = (p: PlaceResult): HotelResult => ({
+    placeId: p.id,
+    name: p.name,
+    address: p.address,
+    image: toEditorImage(placePhotoImage(p), 200),
+  });
+
+  // #13: the same cached lodging candidates the draft was grounded in answer instantly.
+  const brief = parseStoredBrief(tree.brief);
+  if (brief && cleanCity) {
+    const lists = await hotelCandidates(
+      [cleanCity],
+      country,
+      brief.budget,
+      session.tenant.id,
+    ).catch(() => null);
+    const hits = filterCandidates(
+      q.data.toLowerCase().replace(cleanCity.toLowerCase(), ""),
+      lists?.[cityKey(cleanCity)] ?? [],
+    );
+    if (hits.length) return { results: hits.slice(0, 5).map((c) => toResult(c.place)) };
+  }
+
   const text =
     cleanCity && !q.data.toLowerCase().includes(cleanCity.toLowerCase())
       ? `${q.data}, ${cleanCity}`
@@ -97,12 +122,7 @@ export async function searchHotels(
       error: "Hotel search is unavailable right now. Try again or enter the hotel manually.",
     };
   return {
-    results: res.places.slice(0, 5).map((p) => ({
-      placeId: p.id,
-      name: p.name,
-      address: p.address,
-      image: toEditorImage(placePhotoImage(p), 200),
-    })),
+    results: res.places.slice(0, 5).map(toResult),
   };
 }
 

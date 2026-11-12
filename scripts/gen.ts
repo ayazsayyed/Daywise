@@ -110,7 +110,7 @@ async function main() {
   console.log("");
   console.log(
     `Verification: hotels ${s.hotels}/${s.hotels_total} (${pct(s.hotels, s.hotels_total)}) · stops ${s.stops}/${s.stops_total} (${pct(s.stops, s.stops_total)})` +
-      ` · Places calls ${s.places_calls}${s.budget_exhausted ? " · BUDGET EXHAUSTED" : ""}${s.places_failed ? ` · PLACES FAILED ${s.places_failed}× (key/network; see log)` : ""}`,
+      ` · from list ${s.hotels_from_list}, off list ${s.hotels_off_list} · Places calls ${s.places_calls}${s.budget_exhausted ? " · BUDGET EXHAUSTED" : ""}${s.places_failed ? ` · PLACES FAILED ${s.places_failed}× (key/network; see log)` : ""}`,
   );
   const tokens = usage.reduce((a, u) => a + u.tokensIn + u.tokensOut, 0);
   const providers = [...new Set(usage.filter((u) => u.ok).map((u) => `${u.provider}/${u.model}`))];

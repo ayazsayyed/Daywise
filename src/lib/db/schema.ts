@@ -1,17 +1,24 @@
 import { relations, sql } from "drizzle-orm";
 import {
   boolean,
+  customType,
   date,
   index,
   integer,
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+
+/** Postgres bytea ↔ Buffer (drizzle has no built-in bytea column). */
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => "bytea",
+});
 
 // ── Enums ────────────────────────────────────────────────────────────────
 export const tenantStatusEnum = pgEnum("tenant_status", ["trial", "active", "suspended"]);
@@ -259,9 +266,55 @@ export const shareLinks = pgTable(
     enabled: boolean("enabled").notNull().default(true),
     viewCount: integer("view_count").notNull().default(0),
     lastViewedAt: timestamp("last_viewed_at", { withTimezone: true }),
+    /** "mobile" | "desktop" for the share panel's "last viewed, on mobile". */
+    lastViewedDevice: text("last_viewed_device"),
     ...timestamps,
   },
   (t) => [index("share_links_itinerary_idx").on(t.itineraryId)],
+);
+
+/**
+ * One row per link, device and hour (Part 2 deviation 7): a page open counts
+ * once per hour per device. `visitor` is a salted hash of IP + user agent; the
+ * raw IP is never stored. Rows older than a day are pruned on write.
+ */
+export const shareViews = pgTable(
+  "share_views",
+  {
+    linkId: uuid("link_id")
+      .notNull()
+      .references(() => shareLinks.id, { onDelete: "cascade" }),
+    visitor: text("visitor").notNull(),
+    hour: timestamp("hour", { withTimezone: true }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.linkId, t.visitor, t.hour] })],
+);
+
+/**
+ * PDF renders (Day 4). The PDF is never stored as a file: the worker writes
+ * the bytes here, the agent's browser downloads them once and the row is
+ * deleted; anything older than 10 minutes is swept by the worker.
+ */
+export const pdfJobs = pgTable(
+  "pdf_jobs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    itineraryId: uuid("itinerary_id")
+      .notNull()
+      .references(() => itineraries.id, { onDelete: "cascade" }),
+    /** queued | rendering | done | failed */
+    status: text("status").notNull().default("queued"),
+    pages: integer("pages"),
+    bytes: integer("bytes"),
+    ms: integer("ms"),
+    pdf: bytea("pdf"),
+    error: text("error"),
+    ...timestamps,
+  },
+  (t) => [index("pdf_jobs_tenant_idx").on(t.tenantId, t.createdAt)],
 );
 
 // ── Places + usage + audit + learning ────────────────────────────────────
@@ -279,6 +332,10 @@ export type UsageMeta = {
   ms?: number;
   op?: string;
   ok?: boolean;
+  /** PDF renders (Day 4). */
+  itinerary_id?: string;
+  pages?: number;
+  bytes?: number;
 };
 
 export const usageEvents = pgTable(

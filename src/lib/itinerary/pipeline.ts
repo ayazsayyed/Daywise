@@ -4,6 +4,7 @@ import { learningsFor } from "@/lib/ai/learnings";
 import type { UsageReport } from "@/lib/ai/providers";
 import { briefSchema, type Brief } from "@/lib/ai/schemas";
 import { recordAiUsage } from "@/lib/ai/usage";
+import { hotelCandidates, type HotelCandidates } from "@/lib/places/hotels";
 
 import { verifyItinerary, type VerifiedItinerary } from "./verify";
 
@@ -69,8 +70,14 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
   // 2. Draft
   t = Date.now();
   await tick({ step: "drafting" });
-  const learnings = await learningsFor(input.tenantId, brief.destination).catch(() => undefined);
-  const draft = await generate(brief, learnings, { onUsage });
+  // Learnings and grounded hotel candidates (#13) in parallel; both are cheap on a warm cache.
+  const [learnings, hotels] = await Promise.all([
+    learningsFor(input.tenantId, brief.destination).catch(() => undefined),
+    hotelCandidates(brief.cities, brief.country, brief.budget, input.tenantId).catch(
+      () => ({}) as HotelCandidates,
+    ),
+  ]);
+  const draft = await generate(brief, { learnings, hotels }, { onUsage });
   timings.drafting = Date.now() - t;
   await tick({
     step: "drafting",
@@ -82,7 +89,9 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
   // 3 + 4. Verify and photos (one pass; photos ride along with verification)
   t = Date.now();
   await tick({ step: "verifying" });
-  const itinerary = await verifyItinerary(draft, brief, input.tenantId, input.themeColor);
+  const itinerary = await verifyItinerary(draft, brief, input.tenantId, input.themeColor, {
+    hotels,
+  });
   timings.verifying = Date.now() - t;
   const s = itinerary.stats;
   await tick({

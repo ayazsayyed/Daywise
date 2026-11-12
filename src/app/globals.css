@@ -33,6 +33,11 @@
   --color-photo-clay: #d7cec7;
   --color-scrim: rgb(28 27 25 / 0.2);
 
+  /* Client page (DESIGN.md Part 2). The accent is set per tenant on the page root. */
+  --color-tenant: var(--tenant-accent, #2e3a8c);
+  --color-on-tenant: #f7f5f1;
+  --color-paper: #f7f5f1;
+
   /* shadcn semantic names mapped onto the tokens above */
   --color-background: var(--color-surface);
   --color-foreground: var(--color-ink);
