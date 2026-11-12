@@ -7,6 +7,8 @@ import { z } from "zod";
  */
 const schema = z.object({
   APP_URL: z.string().url().default("http://localhost:3000"),
+  /** Where the worker reaches the app to print PDFs (compose: http://app:3000). Defaults to APP_URL. */
+  INTERNAL_APP_URL: z.string().url().optional(),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   SESSION_SECRET: z.string().min(32, "SESSION_SECRET must be at least 32 characters"),
   SUPERADMIN_EMAIL: z.string().email(),

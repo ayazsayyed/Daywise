@@ -41,11 +41,13 @@
     "next": "15.5.29",
     "pg-boss": "^12.38.1",
     "pino": "^10.4.0",
+    "playwright": "1.65.0",
     "postgres": "^3.4.9",
     "react": "19.2.9",
     "react-dom": "19.2.9",
     "resend": "^6.37.0",
     "server-only": "^0.0.1",
+    "sharp": "^0.35.5",
     "tailwind-merge": "^3.7.0",
     "zod": "^4.6.7"
   },

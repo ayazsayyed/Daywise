@@ -287,3 +287,42 @@ describe("helpers", () => {
     expect(suspendedPastGrace({ ...t(40), status: "active" }, now)).toBe(false);
   });
 });
+
+import { pdfFilename, shareUrl } from "./url";
+
+describe("share url", () => {
+  const t = { slug: "sktw", customDomain: null };
+  it("uses the custom domain, else the tenant subdomain, else localhost", () => {
+    expect(
+      shareUrl(
+        { slug: "sktw", customDomain: "itinerary.sktw.example" },
+        "abc",
+        "https://planner.smallsoftware.in",
+      ),
+    ).toBe("https://itinerary.sktw.example/s/abc");
+    expect(shareUrl(t, "abc", "https://planner.smallsoftware.in")).toBe(
+      "https://sktw.planner.smallsoftware.in/s/abc",
+    );
+    expect(shareUrl(t, "abc", "http://localhost:3000")).toBe("http://localhost:3000/s/abc");
+  });
+  it("makes a safe PDF filename", () => {
+    expect(pdfFilename("Kashmir for Ananya & Rohit")).toBe("Kashmir-for-Ananya-Rohit.pdf");
+    expect(pdfFilename("  ")).toBe("itinerary.pdf");
+  });
+});
+
+import { printSizedUrl } from "./print-size";
+
+describe("print photo sizes", () => {
+  it("re-encodes Google photos through the proxy and resizes Pexels", () => {
+    expect(printSizedUrl("/api/photo/abc?w=1200", 800, 70)).toBe("/api/photo/abc?w=800&q=70");
+    expect(
+      printSizedUrl(
+        "https://images.pexels.com/photos/1/p.jpeg?auto=compress&cs=tinysrgb&h=650&w=940&dpr=2",
+        1200,
+        72,
+      ),
+    ).toBe("https://images.pexels.com/photos/1/p.jpeg?auto=compress&cs=tinysrgb&w=1200");
+    expect(printSizedUrl("/placeholder.svg?label=x", 1200, 72)).toBe("/placeholder.svg?label=x");
+  });
+});

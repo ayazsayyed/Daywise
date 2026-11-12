@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { toEditorDoc } from "@/features/editor/load";
 import { tenantBrandingSchema } from "@/lib/db/json";
 import { resolveShare, shareTenantByToken, type ShareTenant } from "@/lib/db/share";
@@ -7,6 +9,7 @@ import { DEFAULT_BRANDING } from "@/lib/db/json";
 import type { EditorDoc } from "@/lib/itinerary/doc";
 import { logger } from "@/lib/logger";
 
+import { printSizedUrl } from "./print-size";
 import { buildAgency, buildShareView, type ShareAgency, type ShareView } from "./view";
 
 export type ShareLoad =
@@ -34,26 +37,29 @@ function agencyOf(tenant: ShareTenant, title = ""): ShareAgency {
 
 /** Print: photos at the PDF re-encode targets (hero 1200 q72, hotel 800 q70). */
 function printPhotos(doc: EditorDoc): EditorDoc {
-  const q = (url: string, w: number, quality: number) =>
-    url.startsWith("/api/photo/") ? url.replace(/\?w=\d+/, `?w=${w}&q=${quality}`) : url;
   return {
     ...doc,
     days: doc.days.map((d) => ({
       ...d,
-      hero: d.hero ? { ...d.hero, url: q(d.hero.url, 1200, 72) } : null,
+      hero: d.hero ? { ...d.hero, url: printSizedUrl(d.hero.url, 1200, 72) } : null,
       hotel: d.hotel
         ? {
             ...d.hotel,
-            image: d.hotel.image ? { ...d.hotel.image, url: q(d.hotel.image.url, 800, 70) } : null,
+            image: d.hotel.image
+              ? { ...d.hotel.image, url: printSizedUrl(d.hotel.image.url, 800, 70) }
+              : null,
           }
         : null,
     })),
   };
 }
 
-export async function loadShare(token: string, opts: { print?: boolean } = {}): Promise<ShareLoad> {
+export const loadShare = cache(async function loadShare(
+  token: string,
+  print = false,
+): Promise<ShareLoad> {
   try {
-    const res = await resolveShare(token);
+    const res = await resolveShare(token, undefined, { allowDisabledLink: print });
     if (res.kind === "not_found") return res;
     if (res.kind === "disabled") {
       const agency = agencyOf(res.tenant);
@@ -64,7 +70,7 @@ export async function loadShare(token: string, opts: { print?: boolean } = {}): 
     const parsed = tenantBrandingSchema.safeParse(tenant.branding);
     const branding = parsed.success ? parsed.data : { ...DEFAULT_BRANDING, ...tenant.branding };
     let doc = toEditorDoc(tree);
-    if (opts.print) doc = printPhotos(doc);
+    if (print) doc = printPhotos(doc);
     const raw = (tree.brief ?? {}) as Record<string, unknown>;
     const view = buildShareView({
       doc,
@@ -84,4 +90,4 @@ export async function loadShare(token: string, opts: { print?: boolean } = {}): 
     }
     return { kind: "unavailable", agency };
   }
-}
+});

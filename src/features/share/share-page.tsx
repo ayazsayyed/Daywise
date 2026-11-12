@@ -446,7 +446,7 @@ function Footer({ view }: { view: ShareView }) {
   return (
     <footer id="contact" className="share-footer mt-16 pb-10 md:mt-24 print:pb-0">
       <hr className="border-tenant/70 border-t" />
-      <div className="grid gap-8 pt-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] md:gap-12 print:grid-cols-[1fr_1.3fr]">
+      <div className="grid gap-8 pt-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] md:gap-12 print:grid-cols-[1fr_1.7fr]">
         <div>
           <Wordmark agency={agency} />
           {agency.footer ? (

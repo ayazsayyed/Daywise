@@ -55,3 +55,15 @@ describe("view de-dupe", () => {
     expect(clientIp(new Headers())).toBe("");
   });
 });
+
+import { printSignature, validPrintSignature } from "./print-sign";
+
+describe("print signature", () => {
+  it("accepts only the worker's signature for that token", () => {
+    const sig = printSignature("tok-aaaaaaaaaaaaaaaaaaaaaaaa", "s3cret");
+    expect(validPrintSignature("tok-aaaaaaaaaaaaaaaaaaaaaaaa", sig, "s3cret")).toBe(true);
+    expect(validPrintSignature("tok-bbbbbbbbbbbbbbbbbbbbbbbb", sig, "s3cret")).toBe(false);
+    expect(validPrintSignature("tok-aaaaaaaaaaaaaaaaaaaaaaaa", undefined, "s3cret")).toBe(false);
+    expect(validPrintSignature("tok-aaaaaaaaaaaaaaaaaaaaaaaa", "x", "s3cret")).toBe(false);
+  });
+});

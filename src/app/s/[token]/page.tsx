@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { after } from "next/server";
 
 import { loadShare } from "@/features/share/load";
+import { validPrintSignature } from "@/features/share/print-sign";
 import { SharePage } from "@/features/share/share-page";
 import { DisabledState, UnavailableState } from "@/features/share/states";
 import { clientIp, deviceOf, hourBucket, isBotUA, visitorHash } from "@/features/share/tracking";
@@ -15,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 type Props = {
   params: Promise<{ token: string }>;
-  searchParams: Promise<{ print?: string }>;
+  searchParams: Promise<{ print?: string; sig?: string }>;
 };
 
 /**
@@ -46,8 +47,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ShareRoute({ params, searchParams }: Props) {
   const [{ token }, sp] = await Promise.all([params, searchParams]);
-  const print = sp.print === "1";
-  const res = await loadShare(token, { print });
+  const print = sp.print === "1" && validPrintSignature(token, sp.sig, env.SESSION_SECRET);
+  const res = await loadShare(token, print);
 
   if (res.kind === "not_found") notFound();
   if (res.kind === "disabled") return <DisabledState agency={res.agency} />;

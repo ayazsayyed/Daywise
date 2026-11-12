@@ -32,6 +32,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ ref: string
     Math.max(100, Number.isFinite(wParam) ? wParam : PHOTO_MAX_WIDTH),
   );
 
+  const qParam = Number(req.nextUrl.searchParams.get("q") ?? "");
+  const quality = Number.isInteger(qParam) && qParam >= 40 && qParam <= 90 ? qParam : null;
+
   const place = await cachedPlace(placeIdOf(name)).catch(() => null);
   const photo = place?.photos.find((p) => p.name === name) ?? place?.photos[0];
   const label = place?.name ?? "Photo";
@@ -69,6 +72,18 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ ref: string
     });
     if (photo?.attribution) headers.set("X-Photo-Attribution", asciiSafe(photo.attribution));
     if (photo?.attributionUrl) headers.set("X-Photo-Attribution-Url", photo.attributionUrl);
+    // PDF print targets (Part 2): `?q=72` re-encodes to a compact progressive JPEG.
+    if (quality) {
+      const { default: sharp } = await import("sharp");
+      const out = await sharp(Buffer.from(await img.arrayBuffer()))
+        .rotate()
+        .resize({ width, withoutEnlargement: true })
+        .jpeg({ quality, progressive: true, mozjpeg: true })
+        .toBuffer();
+      headers.set("Content-Type", "image/jpeg");
+      headers.set("Content-Length", String(out.length));
+      return new NextResponse(new Uint8Array(out), { status: 200, headers });
+    }
     const len = img.headers.get("content-length");
     if (len) headers.set("Content-Length", len);
     return new NextResponse(img.body, { status: 200, headers });

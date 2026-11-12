@@ -54,12 +54,16 @@ export async function shareTenantByToken(token: string, conn: Db = db) {
   return tenant ? { link, tenant } : null;
 }
 
-export async function resolveShare(token: string, conn: Db = db): Promise<ShareResolution> {
+export async function resolveShare(
+  token: string,
+  conn: Db = db,
+  opts: { allowDisabledLink?: boolean } = {},
+): Promise<ShareResolution> {
   const found = await shareTenantByToken(token, conn);
   if (!found) return { kind: "not_found" };
   const { link, tenant } = found;
   if (
-    !link.enabled ||
+    (!link.enabled && !opts.allowDisabledLink) ||
     link.itinerary.deletedAt ||
     link.itinerary.isTemplate ||
     suspendedPastGrace(tenant)
