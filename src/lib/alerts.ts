@@ -15,20 +15,21 @@ export async function alert(
   key: string,
   message: string,
   extra: Record<string, unknown> = {},
-): Promise<void> {
+): Promise<string | undefined> {
   const now = Date.now();
   const prev = lastSent.get(key) ?? 0;
-  if (now - prev < THROTTLE_MS) return;
+  if (now - prev < THROTTLE_MS) return undefined;
   lastSent.set(key, now);
 
   (level === "error" ? logger.error : logger.warn).call(logger, { alert: key, ...extra }, message);
-  if (!env.SENTRY_DSN) return;
+  if (!env.SENTRY_DSN) return undefined;
   try {
     // @sentry/core: runtime-agnostic, shares the client initialised by either SDK.
     const Sentry = await import("@sentry/core");
-    Sentry.captureMessage(message, { level, tags: { alert: key }, extra });
+    return Sentry.captureMessage(message, { level, tags: { alert: key }, extra });
   } catch (err) {
     logger.error({ err }, "Sentry capture failed");
+    return undefined;
   }
 }
 

@@ -1,0 +1,124 @@
+name: Ops
+
+# Manual server operations over the same SSH key as the deploy job.
+# Actions → Ops → Run workflow → pick a task. Never prints secret values.
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: Task to run on the KVM
+        required: true
+        type: choice
+        options:
+          - status
+          - fix-ai-env
+          - sentry-test
+          - backup-now
+          - backup-list
+          - backup-restore-check
+          - set-places-key
+          - logs
+      service:
+        description: "logs only: compose service (app, worker, backup, caddy, postgres)"
+        required: false
+        default: app
+
+concurrency:
+  group: ops
+  cancel-in-progress: false
+
+jobs:
+  ops:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -t ed25519 -T 15 -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Run ${{ inputs.task }}
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          TASK: ${{ inputs.task }}
+          SERVICE: ${{ inputs.service }}
+          # Only used by set-places-key; passed over stdin, never echoed.
+          NEW_PLACES_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY_PROD }}
+        run: |
+          case "$SERVICE" in app|worker|backup|caddy|postgres|migrate) ;; *) echo "bad service"; exit 1 ;; esac
+          # bash -s reads its script from stdin line by line, so the first line reads
+          # the next stdin line (the key) into a variable before the script continues.
+          { printf 'IFS= read -r NEW_PLACES_KEY || true\n%s\n' "$NEW_PLACES_KEY"; cat <<'REMOTE'; } | ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" "TASK='$TASK' SERVICE='$SERVICE' bash -s"
+          set -euo pipefail
+          cd ~/daywise
+
+          env_names() { grep -E '^[A-Z0-9_]+=.+' .env | cut -d= -f1 | sort | tr '\n' ' '; echo; }
+          env_value() { grep -E "^$1=" .env | tail -1 | cut -d= -f2- | sed -E 's/[[:space:]]+#.*$//; s/^"(.*)"$/\1/'; }
+          backup_env() { cp -p .env ".env.bak-$(date +%Y%m%d%H%M)"; }
+          set_env() { # set_env NAME VALUE (value read from the argument, never printed)
+            if grep -qE "^$1=" .env; then
+              tmp=$(mktemp); V="$2" awk -v k="$1" 'BEGIN{FS="="} $1==k{print k"="ENVIRON["V"]; next} {print}' .env > "$tmp"
+              cat "$tmp" > .env; rm -f "$tmp"
+            else printf '%s=%s\n' "$1" "$2" >> .env; fi
+          }
+          ai_check() {
+            p=$(env_value AI_PROVIDER); f=$(env_value AI_FALLBACK_PROVIDER)
+            [ "$p" = groq ] && echo "AI_PROVIDER: ok (groq)" || echo "AI_PROVIDER: NOT groq (${p:-unset})"
+            [ "$f" = gemini ] && echo "AI_FALLBACK_PROVIDER: ok (gemini)" || echo "AI_FALLBACK_PROVIDER: NOT gemini (${f:-unset})"
+          }
+
+          case "$TASK" in
+            status)
+              echo "== set .env names =="; env_names
+              echo "== AI providers =="; ai_check
+              echo "== compose =="; docker compose ps --format 'table {{.Service}}\t{{.Status}}\t{{.Image}}'
+              ;;
+            fix-ai-env)
+              ai_check
+              if [ "$(env_value AI_PROVIDER)" != groq ] || [ "$(env_value AI_FALLBACK_PROVIDER)" != gemini ]; then
+                backup_env
+                set_env AI_PROVIDER groq; set_env AI_FALLBACK_PROVIDER gemini
+                echo "fixed; restarting app + worker"
+                docker compose up -d --force-recreate app worker
+              else echo "nothing to fix"; fi
+              ai_check
+              ;;
+            sentry-test)
+              echo "== worker =="
+              docker compose exec -T worker pnpm -s tsx --import ./src/worker/instrument.ts scripts/ops/sentry-test.ts
+              echo "== app =="
+              docker compose exec -T app node -e '
+                const t=require("crypto").createHmac("sha256",process.env.SESSION_SECRET).update("ops:sentry-test").digest("hex");
+                fetch("http://localhost:3000/api/ops/sentry-test",{method:"POST",headers:{"x-ops-token":t}})
+                  .then(r=>r.text()).then(console.log).catch(e=>{console.error(e);process.exit(1)})'
+              ;;
+            backup-now)
+              docker compose exec -T backup /usr/local/bin/backup.sh
+              docker compose exec -T backup /usr/local/bin/restore.sh list | tail -5
+              ;;
+            backup-list)
+              docker compose exec -T backup /usr/local/bin/restore.sh list
+              docker compose exec -T backup cat /etc/crontabs/root
+              ;;
+            backup-restore-check)
+              # Restores the newest backup into a scratch database, prints row counts, drops it.
+              docker compose exec -T backup sh -c '/usr/local/bin/restore.sh latest daywise_restore_check && dropdb daywise_restore_check && echo "scratch database dropped"'
+              ;;
+            set-places-key)
+              [ -n "$NEW_PLACES_KEY" ] || { echo "Actions secret GOOGLE_PLACES_API_KEY_PROD is empty"; exit 1; }
+              backup_env
+              set_env GOOGLE_PLACES_API_KEY "$NEW_PLACES_KEY"
+              echo "GOOGLE_PLACES_API_KEY replaced (length ${#NEW_PLACES_KEY}); restarting app + worker"
+              docker compose up -d --force-recreate app worker
+              ;;
+            logs)
+              docker compose logs --no-color --tail 200 "$SERVICE"
+              ;;
+            *) echo "unknown task $TASK"; exit 1 ;;
+          esac
+          REMOTE

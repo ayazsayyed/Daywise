@@ -1,0 +1,2 @@
+# 22:00 UTC = 03:30 IST (Asia/Kolkata has no DST).
+0 22 * * * /usr/local/bin/backup.sh > /proc/1/fd/1 2>&1

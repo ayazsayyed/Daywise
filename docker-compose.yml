@@ -52,6 +52,21 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  # Nightly pg_dump → R2 at 03:30 IST, 14-day retention (docker/backup/).
+  backup:
+    image: ghcr.io/ayazsayyed/daywise-backup:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PGHOST: postgres
+      PGUSER: daywise
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      PGDATABASE: daywise
+      BACKUP_RETENTION_DAYS: "14"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
