@@ -43,6 +43,8 @@ export type TextSearchResult = {
   /** True when the budget guard refused the call (nothing was searched). */
   budgetExhausted: boolean;
   fromCache: boolean;
+  /** Places could not answer (no key, HTTP error, network). Distinct from budget. */
+  failed?: "no_key" | "http" | "network";
 };
 
 export function normaliseQuery(q: string, bias?: LocationBias, includedType?: string): string {
@@ -149,7 +151,7 @@ export async function textSearch(
 
   if (!env.GOOGLE_PLACES_API_KEY) {
     logger.warn("GOOGLE_PLACES_API_KEY missing; skipping verification");
-    return { places: [], budgetExhausted: true, fromCache: false };
+    return { places: [], budgetExhausted: false, fromCache: false, failed: "no_key" };
   }
 
   const allowed = await placesBudget().spend("places_search", opts.tenantId ?? null);
@@ -187,13 +189,13 @@ export async function textSearch(
         { status: res.status, query, text: (await res.text()).slice(0, 300) },
         "Places error",
       );
-      return { places: [], budgetExhausted: false, fromCache: false };
+      return { places: [], budgetExhausted: false, fromCache: false, failed: "http" };
     }
     const json = (await res.json()) as { places?: RawPlace[] };
     raw = json.places ?? [];
   } catch (err) {
     logger.error({ err, query }, "Places request failed");
-    return { places: [], budgetExhausted: false, fromCache: false };
+    return { places: [], budgetExhausted: false, fromCache: false, failed: "network" };
   }
 
   const places = raw.map(parsePlace).filter((p): p is PlaceResult => !!p);

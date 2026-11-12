@@ -114,6 +114,8 @@ export function shouldFallback(err: unknown): boolean {
   if (APICallError.isInstance(err)) {
     const s = err.statusCode;
     if (s === 429 || (s !== undefined && s >= 500)) return true;
+    // Bad or revoked key / no access to the model: this provider cannot answer, the next one may.
+    if (s === 401 || s === 403) return true;
     if (s === undefined) return true; // network / DNS / reset
     return err.isRetryable;
   }

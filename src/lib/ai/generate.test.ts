@@ -78,10 +78,10 @@ describe("schema rejections (#10)", () => {
   it("does not swallow non-schema errors", async () => {
     const runner = vi.fn(async () => {
       throw new APICallError({
-        message: "Invalid API Key",
+        message: "Please reduce the length of the messages or completion.",
         url: "u",
         requestBodyValues: {},
-        statusCode: 401,
+        statusCode: 400,
         isRetryable: false,
       });
     }) as unknown as Runner;

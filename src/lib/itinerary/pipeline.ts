@@ -88,7 +88,7 @@ export async function runPipeline(input: PipelineInput): Promise<PipelineOutput>
   await tick({
     step: "verifying",
     ms: timings.verifying,
-    result: `${s.hotels}/${s.hotels_total} hotels and ${s.stops}/${s.stops_total} stops verified${s.budget_exhausted ? " (Places budget exhausted)" : ""}`,
+    result: `${s.hotels}/${s.hotels_total} hotels and ${s.stops}/${s.stops_total} stops verified${s.budget_exhausted ? " (Places budget exhausted)" : s.places_failed ? " (Places unavailable)" : ""}`,
   });
   await tick({ step: "photos" });
   const photos = itinerary.days.filter((d) => d.hero_image.source !== "placeholder").length;
