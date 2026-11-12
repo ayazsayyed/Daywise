@@ -209,3 +209,57 @@ export function mockItinerary(brief: Brief): ItineraryDraft {
     notes: ["Timings and sightseeing are subject to weather and local conditions."],
   };
 }
+
+/** MOCK_AI regenerate-day: a plausible different plan for the same city. */
+export function mockDay(
+  brief: Brief,
+  target: { day_number: number; city: string; stops: string[] },
+  isLast: boolean,
+): ItineraryDraft["days"][number] {
+  const city = target.city || brief.cities[0] || "Srinagar";
+  const base = SIGHTS[city] ?? [`${city} old town`, `${city} viewpoint`, `${city} market`];
+  const fresh = base.filter((s) => !target.stops.includes(s));
+  const pick = (fresh.length ? fresh : [...base].reverse()).slice(0, 2);
+  const hotel = HOTELS[city]?.[0] ?? { name: `${city} Heritage Hotel`, room: "Deluxe room" };
+  return {
+    day_number: target.day_number,
+    title: isLast ? `Last morning in ${city}` : `${city}, a slower day`,
+    city,
+    summary: isLast
+      ? "A walk after breakfast, then the drive to the airport."
+      : `A gentler plan for ${city} with fewer drives and a long lunch.`,
+    transport: isLast
+      ? `Private car to ${city} airport, about 1 h`
+      : `Private car around ${city}, short hops only`,
+    stops: isLast
+      ? [
+          {
+            kind: "transfer",
+            title: `Transfer to ${city} airport`,
+            description: "Check out and drive to the airport.",
+            time: "10:00",
+            duration: "1 h",
+            place_query: null,
+          },
+        ]
+      : pick.map((s, j) => ({
+          kind: "sight" as const,
+          title: s,
+          description: `Time at ${s} without hurrying.`,
+          time: `${String(10 + j * 4).padStart(2, "0")}:00`,
+          duration: "2 h",
+          place_query: `${s}, ${city}`,
+        })),
+    hotel: isLast
+      ? null
+      : {
+          name: hotel.name,
+          city,
+          room_type: hotel.room,
+          meal_plan: "MAP",
+          check_in: "14:00",
+          check_out: "11:00",
+          place_query: `${hotel.name}, ${city}`,
+        },
+  };
+}

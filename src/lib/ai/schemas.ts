@@ -69,6 +69,24 @@ export const briefSchema = z
 
 export type Brief = z.infer<typeof briefSchema>;
 
+/**
+ * Brief as stored on an itinerary (`itineraries.brief` carries extra keys:
+ * prompt, summary, draft_notes; Day 2 rows stored the draft notes array under
+ * `notes`). Returns the clean Brief, or null.
+ */
+export function parseStoredBrief(raw: unknown): Brief | null {
+  if (!raw || typeof raw !== "object") return null;
+  const {
+    prompt: _p,
+    summary: _s,
+    draft_notes: _d,
+    notes,
+    ...rest
+  } = raw as Record<string, unknown>;
+  const r = briefSchema.safeParse({ ...rest, notes: typeof notes === "string" ? notes : null });
+  return r.success ? r.data : null;
+}
+
 /** Dates derived from the brief: day N is start_date + (N-1). */
 export function briefDates(brief: Pick<Brief, "start_date" | "nights">): string[] | null {
   if (!brief.start_date) return null;
@@ -191,6 +209,28 @@ export function itinerarySchemaFor(brief: Pick<Brief, "nights">) {
         });
       }
     });
+  });
+}
+
+/** One day (regenerate-day): the day must be number N, hotel per night, stops unless departure. */
+export function daySchemaFor(dayNumber: number, isLast: boolean) {
+  return daySchema.superRefine((d, ctx) => {
+    if (d.day_number !== dayNumber)
+      ctx.addIssue({ code: "custom", path: ["day_number"], message: `Must be day ${dayNumber}` });
+    if (!isLast && !d.hotel)
+      ctx.addIssue({
+        code: "custom",
+        path: ["hotel"],
+        message: "This day needs a hotel for the night",
+      });
+    if (isLast && d.hotel)
+      ctx.addIssue({
+        code: "custom",
+        path: ["hotel"],
+        message: "The departure day has no hotel night",
+      });
+    if (!isLast && d.stops.length === 0)
+      ctx.addIssue({ code: "custom", path: ["stops"], message: "Add at least one stop" });
   });
 }
 

@@ -132,7 +132,8 @@ export function tenantScope(tenantId: string, conn: Db = db) {
               ...brief,
               prompt: input.prompt,
               summary: itinerary.summary,
-              notes: itinerary.notes,
+              // Keep the agent's brief.notes; the draft's practical notes live beside them.
+              draft_notes: itinerary.notes,
             },
             startDate: dates[0] ?? null,
             endDate: dates[dates.length - 1] ?? null,

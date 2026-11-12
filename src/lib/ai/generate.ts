@@ -1,7 +1,7 @@
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 
-import { mockItinerary } from "./mock";
+import { mockDay, mockItinerary } from "./mock";
 import { systemPrompt } from "./prompts";
 import {
   callStructured,
@@ -12,6 +12,9 @@ import {
 import {
   attachDates,
   briefDates,
+  daySchema,
+  daySchemaFor,
+  type DatedDay,
   describeIssues,
   itineraryDraftSchema,
   itinerarySchemaFor,
@@ -114,6 +117,85 @@ export async function generate(
   }
   throw new GenerationError(
     "The draft did not pass our checks (day count, dates or content rules). Please try again or adjust the brief.",
+    feedback,
+  );
+}
+
+export type DayContext = {
+  day_number: number;
+  date: string | null;
+  city: string;
+  title: string;
+  stops: string[];
+  hotel: string | null;
+};
+
+/**
+ * Regenerate one day inside an existing itinerary. The other days are given as
+ * context so the new day does not repeat them; the date comes from the
+ * editor, never from the model. Same retry-once-then-readable-error rule.
+ */
+export async function generateDay(
+  brief: Brief,
+  days: DayContext[],
+  dayNumber: number,
+  learnings?: Learnings,
+  opts: CallOptions = {},
+): Promise<DatedDay> {
+  const target = days.find((d) => d.day_number === dayNumber);
+  if (!target) throw new GenerationError("That day is no longer in the itinerary.");
+  const isLast = dayNumber === days.length;
+  const schema = daySchemaFor(dayNumber, isLast);
+
+  if (env.MOCK_AI === "1" && !opts.runner) {
+    return { ...schema.parse(mockDay(brief, target, isLast)), date: target.date };
+  }
+
+  const base = [
+    briefToPrompt({ ...brief, nights: days.length - 1 }, learnings),
+    "",
+    "The itinerary as it stands (the agent may have edited it):",
+    ...days.map(
+      (d) =>
+        `Day ${d.day_number}${d.date ? ` (${d.date})` : ""} — ${d.city} — ${d.title}: ${d.stops.join("; ") || "no stops"}${d.hotel ? ` · Hotel: ${d.hotel}` : ""}`,
+    ),
+    "",
+    `Rewrite only Day ${dayNumber} in ${target.city}. Give a clearly different plan from the current one, keep it consistent with the days before and after, and do not repeat their stops.`,
+    isLast
+      ? "This is the departure day: no hotel, and at least one stop (the transfer to the airport or station)."
+      : `This day has a hotel for the night in ${target.city}.`,
+    `Return one day object with day_number ${dayNumber}.`,
+  ].join("\n");
+
+  let feedback = "";
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let res;
+    try {
+      res = await callStructured(
+        {
+          op: "generate-day",
+          schema: daySchema,
+          system: systemPrompt("itinerary"),
+          prompt: feedback
+            ? `${base}\n\nYour previous day was rejected for these reasons:\n${feedback}\nReturn a corrected day.`
+            : base,
+          temperature: 0.7,
+          maxOutputTokens: 4_000,
+        },
+        opts,
+      );
+    } catch (err) {
+      if (!isSchemaRejection(err)) throw err;
+      feedback = schemaRejectionFeedback(err);
+      continue;
+    }
+    const parsed = schema.safeParse(res.object);
+    if (parsed.success) return { ...parsed.data, date: target.date };
+    feedback = describeIssues(parsed.error);
+    logger.warn({ attempt, feedback }, "regenerated day failed validation");
+  }
+  throw new GenerationError(
+    "The new version of this day did not pass our checks. Please try again.",
     feedback,
   );
 }

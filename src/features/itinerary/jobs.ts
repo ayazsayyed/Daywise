@@ -46,3 +46,32 @@ export async function getGenerationJob(tenantId: string, jobId: string) {
     where: and(eq(schema.generationJobs.id, jobId), eq(schema.generationJobs.tenantId, id)),
   });
 }
+
+/** Regenerate one day of a tenant's itinerary (Day 3 brief item 4). */
+export async function enqueueRegenerateDay(
+  tenantId: string,
+  itineraryId: string,
+  dayId: string,
+  label: string,
+) {
+  const id = assertTenantId(tenantId);
+  const [job] = await db
+    .insert(schema.generationJobs)
+    .values({
+      tenantId: id,
+      kind: "day",
+      itineraryId,
+      dayId,
+      prompt: label,
+      status: "queued",
+    })
+    .returning();
+  if (!job) throw new Error("could not create regenerate job");
+  const boss = await getBoss();
+  await boss.send(
+    QUEUES.regenerateDay,
+    { jobId: job.id, tenantId: id },
+    { retryLimit: 1, expireInSeconds: 180 },
+  );
+  return job;
+}

@@ -5,6 +5,7 @@ import { logger } from "@/lib/logger";
 
 export const QUEUES = {
   generate: "generate-itinerary",
+  regenerateDay: "regenerate-day",
   pdf: "render-pdf",
 } as const;
 

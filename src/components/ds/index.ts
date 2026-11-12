@@ -9,3 +9,6 @@ export { SaveState, StatusDot, type ItineraryStatus, type TenantStatus } from ".
 export { TopBar, TOP_BAR_SLOT_ID } from "./top-bar";
 export { TopBarAction } from "./top-bar-action";
 export { TopNav, type NavItem } from "./top-nav";
+export { Dialog } from "./dialog";
+export { Menu, type MenuItem } from "./menu";
+export { Switch } from "./switch";
