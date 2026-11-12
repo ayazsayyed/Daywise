@@ -77,12 +77,18 @@ Check: `AI_PROVIDER=gemini pnpm gen "Goa 3 days"` runs and the output's `AI:` li
 1. https://console.cloud.google.com → New project → name `daywise` → Create.
 2. Billing → Link a billing account. Create one with **country India** and your card. (India billing is what gives 35,000 free Text Search Pro calls/month.) Verification can take a few minutes to a day.
 3. APIs & Services → Library → search **Places API (New)** → Enable. (Not the legacy "Places API".)
-4. APIs & Services → Credentials → Create credentials → API key. Name it `daywise-server`.
-   - Application restrictions: **IP addresses** → add your KVM public IP *and* your home/office IP for local testing (you can remove the local IP later).
-   - API restrictions: Restrict key → Places API (New) only.
-5. Billing → Budgets & alerts → Create budget: ₹2,000/month, alerts at 50/90/100%.
-6. Put the key in `.env.local` as `GOOGLE_PLACES_API_KEY`.
-Check: `pnpm gen "5-day Kashmir couple mid-range"` prints hotels with `verified` and a Places photo ref. If every hotel is unverified, the key restriction or billing is the problem; the CLI error line says which.
+4. **Two keys** (issue #15). APIs & Services → Credentials → Create credentials → API key, twice:
+
+   | Key name | Application restrictions | API restrictions | Lives in |
+   |---|---|---|---|
+   | `daywise-prod` | **IP addresses** → `200.141.14.237` (the KVM) only | Restrict key → **Places API (New)** only | server `~/daywise/.env` `GOOGLE_PLACES_API_KEY` |
+   | `daywise-dev` | None (laptops and cloud sandboxes have changing IPs) | Restrict key → **Places API (New)** only | your `.env.local` `GOOGLE_PLACES_API_KEY` |
+
+   The dev key is the one that existed before go-live (rename it to `daywise-dev`, keep its API restriction, leave application restrictions at None). Never copy the prod key to a laptop: it will fail there by design.
+5. **Put the prod key on the server without SSH:** GitHub → repo Settings → Secrets and variables → Actions → New repository secret `GOOGLE_PLACES_API_KEY_PROD` = the `daywise-prod` key. Then Actions → **Ops** → Run workflow → task `set-places-key`. It backs up `.env`, replaces `GOOGLE_PLACES_API_KEY`, restarts app + worker and prints only the key length. Delete the Actions secret afterwards if you like; the server keeps its copy.
+6. Billing → Budgets & alerts → Create budget: ₹2,000/month, alerts at 50/90/100%. The app also stops calling Places at `PLACES_MONTHLY_TEXT_SEARCH_CAP` / `PLACES_MONTHLY_PHOTO_CAP` and sends a Sentry warning (Ops → `budget-sim` proves it).
+Check (dev): `pnpm gen "5-day Kashmir couple mid-range"` prints hotels with `verified` and a Places photo ref. If every hotel is unverified, the key restriction or billing is the problem; the CLI error line says which.
+Check (prod): open any itinerary on https://daywise.smallsoftware.in — hotel photos load through `/api/photo/…`. The worker log (Ops → `logs`, service `worker`) shows no "PLACES FAILED".
 
 ---
 

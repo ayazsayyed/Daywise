@@ -17,6 +17,7 @@ on:
           - backup-list
           - backup-restore-check
           - set-places-key
+          - budget-sim
           - logs
       service:
         description: "logs only: compose service (app, worker, backup, caddy, postgres)"
@@ -115,6 +116,12 @@ jobs:
               set_env GOOGLE_PLACES_API_KEY "$NEW_PLACES_KEY"
               echo "GOOGLE_PLACES_API_KEY replaced (length ${#NEW_PLACES_KEY}); restarting app + worker"
               docker compose up -d --force-recreate app worker
+              ;;
+            budget-sim)
+              # Day 5 acceptance: Places budget exhausted → the draft completes unverified and
+              # a Sentry warning is sent. Caps forced to 0 for this one process only; nothing saved.
+              docker compose exec -T -e PLACES_MONTHLY_TEXT_SEARCH_CAP=0 -e PLACES_MONTHLY_PHOTO_CAP=0 worker \
+                pnpm -s tsx --import ./src/worker/instrument.ts scripts/gen.ts "3-day Jaipur couple mid-range"
               ;;
             logs)
               docker compose logs --no-color --tail 200 "$SERVICE"

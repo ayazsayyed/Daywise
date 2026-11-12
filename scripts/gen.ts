@@ -122,10 +122,20 @@ async function main() {
   );
 }
 
+/** Budget alerts go to Sentry when run with `--import ./src/worker/instrument.ts`; flush before exit. */
+async function flushSentry() {
+  const Sentry = await import("@sentry/node");
+  await Sentry.flush(5000);
+}
+
 main()
-  .then(() => closeDb())
+  .then(async () => {
+    await flushSentry();
+    await closeDb();
+  })
   .catch(async (err) => {
     console.error(err instanceof Error ? `${err.name}: ${err.message}` : err);
+    await flushSentry();
     await closeDb();
     process.exit(1);
   });

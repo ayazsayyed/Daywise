@@ -1,0 +1,65 @@
+name: E2E (live)
+
+# Runs the Playwright suite against https://daywise.smallsoftware.in.
+# The tests create throwaway `e2e-*` tenants (owners @e2e.test, no mail) and
+# delete them; they reach the production database over an SSH tunnel to write
+# one-time login tokens and test fixtures. Real AI is used for the generate step.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-live
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - name: SSH tunnel to production Postgres
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -t ed25519 -T 15 -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          R="ssh -i $HOME/.ssh/deploy_key $DEPLOY_USER@$DEPLOY_HOST"
+          PG_IP=$($R "cd ~/daywise && docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \$(docker compose ps -q postgres)")
+          PG_PW=$($R "cd ~/daywise && grep -E '^POSTGRES_PASSWORD=' .env | tail -1 | cut -d= -f2-")
+          SA=$($R "cd ~/daywise && grep -E '^SUPERADMIN_EMAIL=' .env | tail -1 | cut -d= -f2- | sed -E 's/[[:space:]]+#.*$//'")
+          echo "::add-mask::$PG_PW"
+          echo "::add-mask::$SA"
+          ssh -i ~/.ssh/deploy_key -fN -o ExitOnForwardFailure=yes -L 15432:"$PG_IP":5432 "$DEPLOY_USER@$DEPLOY_HOST"
+          {
+            echo "DATABASE_URL=postgres://daywise:${PG_PW}@127.0.0.1:15432/daywise"
+            echo "SUPERADMIN_EMAIL=${SA}"
+          } >> "$GITHUB_ENV"
+
+      - name: Playwright against the live site
+        env:
+          E2E_BASE_URL: https://daywise.smallsoftware.in
+        run: pnpm exec playwright test --trace off --reporter=list
+
+      - name: Clean up test tenants (always)
+        if: always()
+        run: |
+          node -e '
+            const postgres = require("postgres");
+            const sql = postgres(process.env.DATABASE_URL, { max: 1 });
+            sql`delete from tenants where slug like ${"e2e-%"}`
+              .then(r => console.log("deleted e2e tenants:", r.count))
+              .finally(() => sql.end());' || true
