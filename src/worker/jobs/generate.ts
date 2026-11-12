@@ -67,6 +67,7 @@ export async function handleGenerate(data: GenerateJobData): Promise<void> {
       itinerary: out.itinerary,
       prompt: job.prompt,
       defaults: tenant.defaults,
+      client: job.client,
     });
     await scope.audit("itinerary.generate", {
       entity: "itinerary",

@@ -5,6 +5,7 @@ import type { Brief } from "@/lib/ai/schemas";
 import type { VerifiedItinerary } from "@/lib/itinerary/verify";
 
 import { db, type Db } from "./index";
+import { hotelRow, itineraryRepo, stopRow } from "./itinerary";
 import * as schema from "./schema";
 import { tenantBrandingSchema, tenantDefaultsSchema } from "./json";
 
@@ -59,6 +60,7 @@ export function tenantScope(tenantId: string, conn: Db = db) {
 
   return {
     tenantId: id,
+    ...itineraryRepo(id, conn),
 
     async getTenant() {
       const row = await conn.query.tenants.findFirst({ where: eq(schema.tenants.id, id) });
@@ -109,17 +111,23 @@ export function tenantScope(tenantId: string, conn: Db = db) {
       itinerary: VerifiedItinerary;
       prompt: string;
       defaults: schema.TenantDefaults;
+      client?: schema.ItineraryClient | null;
     }) {
       const { brief, itinerary } = input;
+      const client = input.client?.name ? input.client : null;
+      // "Kashmir for Ananya & Rohit" when the agent named the client (PNG 10/11).
+      const title = client
+        ? `${brief.destination} for ${shortClientName(client.name)}`
+        : itinerary.title;
       const dates = itinerary.days.map((d) => d.date).filter((d): d is string => !!d);
       return conn.transaction(async (tx) => {
         const [row] = await tx
           .insert(schema.itineraries)
           .values({
             tenantId: id,
-            title: itinerary.title,
+            title,
             status: "draft",
-            client: null,
+            client,
             brief: {
               ...brief,
               prompt: input.prompt,
@@ -149,6 +157,7 @@ export function tenantScope(tenantId: string, conn: Db = db) {
               itineraryId: row.id,
               position: i,
               date: d.date,
+              city: d.city,
               title: d.title,
               summary: d.summary,
               transport: d.transport,
@@ -156,37 +165,9 @@ export function tenantScope(tenantId: string, conn: Db = db) {
             })
             .returning({ id: schema.days.id });
           if (!day) throw new Error("insert day failed");
-
-          if (d.stops.length) {
-            await tx.insert(schema.stops).values(
-              d.stops.map((s, position) => ({
-                dayId: day.id,
-                position,
-                kind: s.kind,
-                title: s.title,
-                description: [s.time, s.description].filter(Boolean).join(" · ") || null,
-                duration: s.duration,
-                placeId: s.place_id,
-                verified: s.verified,
-                image: s.image,
-              })),
-            );
-          }
-          if (d.hotel) {
-            await tx.insert(schema.hotels).values({
-              dayId: day.id,
-              name: d.hotel.name,
-              placeId: d.hotel.place_id,
-              verified: d.hotel.verified,
-              roomType: d.hotel.room_type,
-              mealPlan: d.hotel.meal_plan,
-              checkIn: d.hotel.check_in,
-              checkOut: d.hotel.check_out,
-              address: d.hotel.address,
-              image: d.hotel.image,
-              manual: false,
-            });
-          }
+          if (d.stops.length)
+            await tx.insert(schema.stops).values(d.stops.map((s, p) => stopRow(day.id, p, s)));
+          if (d.hotel) await tx.insert(schema.hotels).values(hotelRow(day.id, d.city, d.hotel));
         }
         return row;
       });
@@ -224,4 +205,11 @@ export function tenantScope(tenantId: string, conn: Db = db) {
       });
     },
   };
+}
+
+/** "Ananya & Rohit Kapoor" → "Ananya & Rohit"; "Suresh Mehta" → "Suresh Mehta". */
+export function shortClientName(name: string): string {
+  const n = name.trim().replace(/\s+/g, " ");
+  const m = n.match(/^(\S+)\s*(&|and)\s*(\S+)\s+\S+$/i);
+  return m ? `${m[1]} & ${m[3]}` : n;
 }
