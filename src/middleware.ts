@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { adminHostRedirect } from "@/lib/config/hosts";
+import { env } from "@/lib/env";
 import { ipFrom, limiter, RULES } from "@/lib/ratelimit";
 
 const SESSION_COOKIE = "dw_session";
@@ -7,6 +9,8 @@ const SESSION_COOKIE = "dw_session";
 /**
  * Node-runtime middleware (one app process, so the in-memory limiter is shared
  * by every request):
+ * - keeps sign-in and the admin on the APP_URL host; tenant hosts serve share
+ *   pages only (#20);
  * - rate limits the public share page (60/min/IP) and the photo proxy;
  * - redirects anonymous requests away from /app/* and /admin/*. Full session
  *   validation (DB lookup, role, tenant status) happens in the server layouts
@@ -14,6 +18,9 @@ const SESSION_COOKIE = "dw_session";
  */
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  const toApp = adminHostRedirect(req.headers.get("host"), pathname, req.nextUrl.search, env.APP_URL);
+  if (toApp) return NextResponse.redirect(toApp, 308);
 
   if (pathname.startsWith("/s/") || pathname.startsWith("/api/photo/")) {
     const isPage = pathname.startsWith("/s/");
@@ -41,6 +48,8 @@ export function middleware(req: NextRequest) {
         });
   }
 
+  if (!pathname.startsWith("/app") && !pathname.startsWith("/admin")) return NextResponse.next();
+
   if (!req.cookies.get(SESSION_COOKIE)?.value) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
@@ -58,5 +67,14 @@ const TOO_MANY_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8
 
 export const config = {
   runtime: "nodejs",
-  matcher: ["/app/:path*", "/admin/:path*", "/s/:path*", "/api/photo/:path*"],
+  matcher: [
+    "/",
+    "/login",
+    "/logout",
+    "/auth/:path*",
+    "/app/:path*",
+    "/admin/:path*",
+    "/s/:path*",
+    "/api/photo/:path*",
+  ],
 };
