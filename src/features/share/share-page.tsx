@@ -180,7 +180,8 @@ export function SharePage({ view, print = false }: { view: ShareView; print?: bo
 
         {/* 3. Day index (mobile/tablet) */}
         {/* The nav is a direct child of <main> so it stays sticky through all the days. */}
-        <div className="h-10 min-[1100px]:hidden md:h-14" aria-hidden />
+        {/* Not in print: after the cover's page break it would fill a blank page (#19). */}
+        <div className="h-10 min-[1100px]:hidden md:h-14 print:hidden" aria-hidden />
         <MobileNav
           days={navDays}
           countWord={view.countWord}

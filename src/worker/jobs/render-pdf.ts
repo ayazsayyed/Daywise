@@ -1,6 +1,11 @@
 import { and, eq, lt } from "drizzle-orm";
-import { chromium, type Browser } from "playwright";
+import { chromium, type Browser, type Page } from "playwright";
 
+import {
+  fitHeroWidth,
+  PRINT_CONTENT_WIDTH_PX,
+  type HeroBlock,
+} from "@/features/share/print-fit";
 import { printSignature } from "@/features/share/print-sign";
 import { db, schema } from "@/lib/db";
 import { mintShareToken } from "@/lib/db/share";
@@ -86,7 +91,8 @@ export async function handleRenderPdf(data: RenderPdfData): Promise<void> {
         await document.fonts.ready;
       });
       await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
-      const pdf = await page.pdf({ format: "A4", preferCSSPageSize: true, printBackground: true });
+      await fitHeroesToPages(page);
+      const pdf =await page.pdf({ format: "A4", preferCSSPageSize: true, printBackground: true });
       const pages = countPdfPages(pdf);
       const ms = Date.now() - started;
       await set({ status: "done", pdf, bytes: pdf.length, pages, ms, error: null });
@@ -107,6 +113,47 @@ export async function handleRenderPdf(data: RenderPdfData): Promise<void> {
       error: "The PDF could not be prepared. Please try again.",
       ms: Date.now() - started,
     });
+  }
+}
+
+/**
+ * Lays the page out at the A4 content width and narrows the cover and day
+ * heroes just enough for each block to fit one page (#19). Two passes: a
+ * narrower hero can re-wrap its caption.
+ */
+async function fitHeroesToPages(page: Page) {
+  await page.setViewportSize({ width: Math.round(PRINT_CONTENT_WIDTH_PX), height: 1123 });
+  for (let pass = 0; pass < 2; pass++) {
+    const blocks: HeroBlock[] = await page.evaluate(() =>
+      [
+        document.querySelector<HTMLElement>(".share-cover"),
+        ...Array.from(document.querySelectorAll<HTMLElement>(".share-day")),
+      ].map((el) => {
+        const hero = el?.querySelector<HTMLElement>("figure.photo > div");
+        if (!el || !hero) return { blockHeight: 0, frameWidth: 0, frameHeight: 0, columnWidth: 0 };
+        const box = el.getBoundingClientRect();
+        const frame = hero.getBoundingClientRect();
+        // The cover shares page 1 with the header, so measure it from the top of the document.
+        const top = el.classList.contains("share-cover") ? -window.scrollY : box.top;
+        return {
+          blockHeight: box.bottom - top,
+          frameWidth: frame.width,
+          frameHeight: frame.height,
+          columnWidth: box.width,
+        };
+      }),
+    );
+    const widths = blocks.map((b) => fitHeroWidth(b));
+    if (widths.every((w) => w === null)) return;
+    await page.evaluate((ws) => {
+      [
+        document.querySelector<HTMLElement>(".share-cover"),
+        ...Array.from(document.querySelectorAll<HTMLElement>(".share-day")),
+      ].forEach((el, i) => {
+        const fig = el?.querySelector<HTMLElement>("figure.photo");
+        if (fig && ws[i] != null) fig.style.width = `${ws[i]}px`;
+      });
+    }, widths);
   }
 }
 
