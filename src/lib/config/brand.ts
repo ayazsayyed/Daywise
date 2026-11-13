@@ -18,6 +18,9 @@ export const LOGIN_HERO_DESTINATIONS = [
   { query: "Hawa Mahal Jaipur", caption: "Hawa Mahal in the morning, Jaipur" },
 ] as const;
 
+/** Shown when no destination image is cached yet or Pexels is unreachable (#17, chosen by Ayaz). */
+export const LOGIN_HERO_FALLBACK = "/login-hero.webp";
+
 /** Six theme-colour presets shown in Settings; dark enough to read on off-white. */
 export const THEME_PRESETS = [
   "#7A3B1D",

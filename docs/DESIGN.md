@@ -89,7 +89,7 @@ No sidebar, stat cards, icons in coloured circles, dashed empty states, illustra
 6. **Settings adds fields** the PDF shows and the schema lacked: `website`, `gstin`, `licence_no` (both optional, printed in footer when present), theme colour presets (six swatches + hex).
 7. **Client block adds** optional `referred_by` and `city`.
 8. **Mobile list** uses a `...` bottom sheet for actions; desktop uses row-hover actions. Both exist.
-9. **Login hero** is a cached Pexels image served from R2 with its caption; rotate between 4 fixed Indian destinations. Never a Google photo here.
+9. **Login hero** is a cached Pexels image served from R2 with its caption; rotate between 4 fixed Indian destinations. Never a Google photo here. When no destination image is cached yet (first lookup slower than 2.5 s) or Pexels is unreachable, show the fixed image `public/login-hero.webp` with no caption (chosen by Ayaz, #17).
 10. **Sign-in copy** per PDF ("Welcome back", "Email me a sign-in link"), footer "support@" uses `SUPPORT_EMAIL` env, default `support@smallsoftware.in`.
 
 ## Implementation notes for Claude Code
