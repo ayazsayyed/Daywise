@@ -135,18 +135,44 @@ test("create tenant, open as it, return, delete it", async ({ page }) => {
   await card.getByRole("button", { name: "Create tenant" }).click();
   await expect(card.getByText("That subdomain is taken")).toBeVisible();
 
+  // Edit name and subdomain (#18); another tenant's subdomain is refused.
+  await page.goto(`/admin/t/${row!.id}`);
+  await page.waitForTimeout(1000); // hydration
+  const form = page.getByRole("region", { name: "Agency, limits and domain" });
+  await form.getByLabel("Subdomain").fill(t.slug);
+  await form.getByRole("button", { name: "Save changes" }).click();
+  await expect(form.getByRole("alert")).toContainText("That subdomain is taken");
+  const renamed = `${name} Renamed`;
+  const newSlug = `${slug}-b`;
+  await form.getByLabel("Agency name").fill(renamed);
+  await form.getByLabel("Subdomain").fill(newSlug);
+  await form.getByRole("button", { name: "Save changes" }).click();
+  await expect(form.getByRole("status")).toContainText("Saved");
+  await page.reload();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(renamed);
+  await expect(page.getByText(`${newSlug}.`)).toBeVisible();
+  const sql3 = sqlClient();
+  const [edited] = await sql3<{ name: string; slug: string }[]>`
+    select name, slug from tenants where id = ${row!.id}`;
+  const upd = await sql3<{ meta: { before: { slug: string } } }[]>`
+    select meta from audit_log where action = 'admin.tenant.update' and entity_id = ${row!.id}`;
+  await sql3.end();
+  expect(edited).toEqual({ name: renamed, slug: newSlug });
+  expect(upd[0]?.meta.before.slug).toBe(slug);
+  const editedName = renamed;
+
   // Login as tenant: banner, the tenant's (empty) list, then back to admin.
   await page.goto(`/admin/t/${row!.id}`);
-  await page.getByRole("button", { name: `Open as ${name}` }).click();
+  await page.getByRole("button", { name: `Open as ${editedName}` }).click();
   await expect(page).toHaveURL(/\/app$/);
-  await expect(page.getByRole("status").filter({ hasText: "Viewing as" })).toContainText(name);
+  await expect(page.getByRole("status").filter({ hasText: "Viewing as" })).toContainText(editedName);
   await page.getByRole("button", { name: "Return to admin" }).click();
   await expect(page).toHaveURL(/\/admin$/);
 
   // Delete with type-to-confirm.
   await page.goto(`/admin/t/${row!.id}`);
   await page.getByRole("button", { name: "Delete tenant…" }).click();
-  await page.getByLabel("Type the agency name to confirm").fill(name);
+  await page.getByLabel("Type the agency name to confirm").fill(editedName);
   await page.getByRole("button", { name: "Delete tenant", exact: true }).click();
   await expect(page).toHaveURL(/\/admin\?deleted=1/);
   const sql2 = sqlClient();
@@ -155,5 +181,5 @@ test("create tenant, open as it, return, delete it", async ({ page }) => {
     select meta from audit_log where action = 'admin.tenant.delete' and entity_id = ${row!.id}`;
   await sql2.end();
   expect(left).toHaveLength(0);
-  expect(audit[0]?.meta.slug).toBe(slug);
+  expect(audit[0]?.meta.slug).toBe(newSlug);
 });

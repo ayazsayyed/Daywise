@@ -6,6 +6,7 @@ import { Field } from "@/components/ds";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TENANT_DOMAIN_SUFFIX } from "@/lib/config/brand";
 import { cn } from "@/lib/utils";
 
 import {
@@ -22,6 +23,8 @@ export function TenantSettingsForm({
 }: {
   tenantId: string;
   initial: {
+    name: string;
+    slug: string;
     plan: string;
     customDomain: string;
     dailyGenCap: number;
@@ -35,6 +38,25 @@ export function TenantSettingsForm({
   );
   return (
     <form action={action} className="flex flex-col gap-5">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Agency name" htmlFor="t-name">
+          <Input id="t-name" name="name" defaultValue={initial.name} maxLength={80} />
+        </Field>
+        <Field
+          label="Subdomain"
+          htmlFor="t-slug"
+          hint={`.${TENANT_DOMAIN_SUFFIX} · changing it stops share links already sent on the old address`}
+        >
+          <Input
+            id="t-slug"
+            name="slug"
+            defaultValue={initial.slug}
+            maxLength={32}
+            spellCheck={false}
+            autoCapitalize="none"
+          />
+        </Field>
+      </div>
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="Drafts / day" htmlFor="t-gen">
           <Input
@@ -91,7 +113,7 @@ export function TenantSettingsForm({
       </div>
       <div className="flex items-center gap-4">
         <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : "Save limits and domain"}
+          {pending ? "Saving…" : "Save changes"}
         </Button>
         {state && (
           <p

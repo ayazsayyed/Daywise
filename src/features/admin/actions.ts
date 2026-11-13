@@ -195,6 +195,8 @@ export async function updateTenantSettings(
   if (!tenant) return { ok: false, message: "Tenant not found" };
   const parsed = capsSchema
     .extend({
+      name: createSchema.shape.name,
+      slug: createSchema.shape.slug,
       plan: z.enum(["trial", "standard"]),
       customDomain: createSchema.shape.customDomain,
     })
@@ -202,6 +204,13 @@ export async function updateTenantSettings(
   if (!parsed.success)
     return { ok: false, message: parsed.error.issues[0]?.message ?? "Check the form" };
   const v = parsed.data;
+  if (v.slug !== tenant.slug) {
+    const taken = await db.query.tenants.findFirst({
+      columns: { id: true },
+      where: and(eq(schema.tenants.slug, v.slug), ne(schema.tenants.id, tenant.id)),
+    });
+    if (taken) return { ok: false, message: "That subdomain is taken", field: "slug" };
+  }
   if (v.customDomain) {
     const clash = await db.query.tenants.findFirst({
       columns: { id: true },
@@ -214,6 +223,8 @@ export async function updateTenantSettings(
   await db
     .update(schema.tenants)
     .set({
+      name: v.name,
+      slug: v.slug,
       dailyGenCap: v.dailyGenCap,
       monthlyAiCap: v.monthlyAiCap,
       monthlyPdfCap: v.monthlyPdfCap,
@@ -230,6 +241,8 @@ export async function updateTenantSettings(
     entityId: tenant.id,
     meta: {
       before: {
+        name: tenant.name,
+        slug: tenant.slug,
         dailyGenCap: tenant.dailyGenCap,
         monthlyAiCap: tenant.monthlyAiCap,
         monthlyPdfCap: tenant.monthlyPdfCap,

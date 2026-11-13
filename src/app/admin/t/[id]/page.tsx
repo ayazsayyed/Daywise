@@ -84,10 +84,15 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
           </p>
         </Section>
 
-        <Section title="Limits and domain" description="Checked when a draft is queued.">
+        <Section
+          title="Agency, limits and domain"
+          description="Limits are checked when a draft is queued."
+        >
           <TenantSettingsForm
             tenantId={t.id}
             initial={{
+              name: t.name,
+              slug: t.slug,
               plan: t.plan,
               customDomain: t.customDomain ?? "",
               dailyGenCap: t.dailyGenCap,
