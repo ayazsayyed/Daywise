@@ -121,7 +121,8 @@ test("create tenant, open as it, return, delete it", async ({ page }) => {
   await expect(card.getByText("Available")).toBeVisible();
   await card.getByLabel("Owner email").fill(`owner-${r}@e2e.test`);
   await card.getByRole("button", { name: "Create tenant" }).click();
-  await expect(card.getByRole("status")).toContainText(`${name} created`);
+  // The first create after a deploy can take several seconds (cold action); 5 s flaked 3 times.
+  await expect(card.getByRole("status")).toContainText(`${name} created`, { timeout: 15_000 });
 
   const sql = sqlClient();
   const [row] = await sql<{ id: string }[]>`select id from tenants where slug = ${slug}`;
