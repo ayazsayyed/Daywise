@@ -58,7 +58,9 @@ const nextConfig: NextConfig = {
     ];
   },
   experimental: {
-    serverActions: { bodySizeLimit: "2mb" },
+    // Largest upload is the 8 MB PDF cover backdrop (src/features/pdf/constants.ts) + multipart overhead.
+    // Logos stay capped at 2 MB in their own action.
+    serverActions: { bodySizeLimit: "9mb" },
   },
 };
 

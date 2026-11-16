@@ -33,6 +33,7 @@ html,body{margin:0!important;padding:0!important;background:transparent!importan
 .pdf-root .share-day:first-child{break-before:auto}
 .pdf-root .share-day .text-tenant{color:var(--pdf-accent-on-paper)!important}
 .pdf-root .share-hotel{background:#FFFFFF!important}
+.pdf-root .share-stop-icon{color:var(--pdf-accent-on-paper)}
 .pdf-sheet{break-after:avoid;break-inside:avoid}
 ${style.css?.(tokens) ?? ""}`;
 

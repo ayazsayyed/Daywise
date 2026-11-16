@@ -4,6 +4,7 @@ import type { EditorDoc, EditorImage } from "@/lib/itinerary/doc";
 import { computePricing } from "@/lib/itinerary/pricing";
 import { areaOf } from "@/lib/places/hotels";
 
+import { stopIcon, transportIcon, type StopIcon } from "./stop-icon";
 import { clientAskMessage, telHref, waHref } from "./whatsapp";
 
 /**
@@ -14,7 +15,7 @@ import { clientAskMessage, telHref, waHref } from "./whatsapp";
 
 export type ShareImage = { url: string; caption: string; credit: string | null; google: boolean };
 
-export type ShareStop = { time: string; title: string; line: string };
+export type ShareStop = { time: string; title: string; line: string; icon: StopIcon };
 
 export type ShareHotel = {
   eyebrow: string;
@@ -36,6 +37,7 @@ export type ShareDay = {
   city: string;
   hero: ShareImage | null;
   transport: string;
+  transportIcon: StopIcon;
   stops: ShareStop[];
   hotel: ShareHotel | null;
   /** Night line for the index and Overview sheet: "Night 1 · Sukoon Houseboat" or "Departure · no hotel". */
@@ -377,10 +379,12 @@ export function buildShareView(input: {
       city: d.city,
       hero: shareImage(d.hero, heroCaption(d)),
       transport: d.transport,
+      transportIcon: transportIcon(d.transport),
       stops: d.stops.map((s) => ({
         time: formatClock(s.time),
         title: s.title,
         line: s.description,
+        icon: stopIcon(s.kind, s.title),
       })),
       hotel,
       nightLine: hotel ? `Night ${night} · ${hotel.name}` : "Departure · no hotel",

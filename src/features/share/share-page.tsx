@@ -1,10 +1,11 @@
-import { CarFront, Phone } from "lucide-react";
+import { Phone } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
 import "./share.css";
 import { DesktopIndex, MobileNav, type NavDay } from "./nav";
 import { ContactTable, HotelPhoto, Photo, tenantStyle, WhatsAppButton, Wordmark } from "./parts";
+import { StopIconView } from "./stop-icon-view";
 import type { ShareDay, ShareView } from "./view";
 
 /**
@@ -283,7 +284,7 @@ export function DaySection({
 
       {day.transport ? (
         <p className="text-ink-secondary mt-5 flex items-start gap-2 text-[13px] leading-5 print:text-[10pt]">
-          <CarFront className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+          <StopIconView icon={day.transportIcon} className="mt-0.5 size-3.5" />
           {day.transport}
         </p>
       ) : null}
@@ -299,11 +300,12 @@ export function DaySection({
                 {s.time}
               </span>
               <div className="min-w-0">
-                <div className="text-ink text-[15px] leading-5 font-semibold print:text-[11pt]">
-                  {s.title}
+                <div className="text-ink flex items-start gap-2 text-[15px] leading-5 font-semibold print:text-[11pt]">
+                  <StopIconView icon={s.icon} className="mt-0.5 print:mt-[0.3mm]" />
+                  <span className="min-w-0">{s.title}</span>
                 </div>
                 {s.line ? (
-                  <p className="share-stop-line text-ink-secondary mt-0.5 text-[15px] leading-[25px]">
+                  <p className="share-stop-line text-ink-secondary mt-0.5 pl-6 text-[15px] leading-[25px]">
                     {s.line}
                   </p>
                 ) : null}

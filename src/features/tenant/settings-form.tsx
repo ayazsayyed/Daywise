@@ -59,6 +59,7 @@ export function SettingsForm({ tenantName, branding, defaults, pdf }: Props) {
     status: "idle",
   });
   const fileRef = useRef<HTMLInputElement>(null);
+  const [logoError, setLogoError] = useState<string | null>(null);
   const [removing, startRemove] = useTransition();
 
   // Server is the source of truth for the logo URL after upload/remove.
@@ -141,7 +142,18 @@ export function SettingsForm({ tenantName, branding, defaults, pdf }: Props) {
                       className="sr-only"
                       form="logo-upload"
                       onChange={(e) => {
-                        if (e.target.files?.[0]) e.target.form?.requestSubmit();
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        // Check before sending: an oversized body never reaches the action.
+                        if (f.size > 2 * 1024 * 1024) {
+                          setLogoError(
+                            `This file is ${(f.size / 1048576).toFixed(1)} MB; logos must be 2 MB or smaller.`,
+                          );
+                          e.target.value = "";
+                          return;
+                        }
+                        setLogoError(null);
+                        e.target.form?.requestSubmit();
                       }}
                     />
                     <Button
@@ -169,9 +181,9 @@ export function SettingsForm({ tenantName, branding, defaults, pdf }: Props) {
                     {form.logo_url ? `${fileNameOf(form.logo_url)} · ` : ""}PNG, SVG or JPG up to 2
                     MB
                   </p>
-                  {uploadState.status === "error" && (
+                  {(logoError || uploadState.status === "error") && (
                     <p className="text-caption text-danger" role="alert">
-                      {uploadState.message}
+                      {logoError ?? (uploadState.status === "error" ? uploadState.message : null)}
                     </p>
                   )}
                 </div>

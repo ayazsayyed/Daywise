@@ -13,7 +13,7 @@ import { isHex } from "@/lib/color";
 import { cn } from "@/lib/utils";
 
 import { previewPdf, removeBackdrop, uploadBackdrop, type BackdropState } from "./actions";
-import { BACKDROP_MIN_PX, PX_PER_MM, A4_MM, type TitleFont } from "./constants";
+import { A4_MM, BACKDROP_MAX_BYTES, BACKDROP_MIN_PX, PX_PER_MM, type TitleFont } from "./constants";
 import { componentsFor } from "./styles";
 import type { StyleMeta } from "./styles/meta";
 import { buildTokens, deriveAccent, MIN_BACKDROP_CONTRAST } from "./tokens";
@@ -58,6 +58,7 @@ export function PdfBrandFields({
   );
   const [removing, startRemove] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
   const contrast = upload.status === "uploaded" ? upload.contrast : (backdrop?.contrast ?? null);
 
   return (
@@ -186,7 +187,21 @@ export function PdfBrandFields({
                   className="sr-only"
                   form="backdrop-upload"
                   onChange={(e) => {
-                    if (e.target.files?.[0]) e.target.form?.requestSubmit();
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    // Check before sending: an oversized body never reaches the action.
+                    const problem =
+                      f.size > BACKDROP_MAX_BYTES
+                        ? `This file is ${(f.size / 1048576).toFixed(1)} MB; the limit is 8 MB. Export as JPG.`
+                        : !["image/png", "image/jpeg"].includes(f.type)
+                          ? "Only PNG or JPG images are accepted."
+                          : null;
+                    setLocalError(problem);
+                    if (problem) {
+                      e.target.value = "";
+                      return;
+                    }
+                    e.target.form?.requestSubmit();
                   }}
                 />
                 <Button
@@ -221,9 +236,9 @@ export function PdfBrandFields({
                   4.5:1). Use a darker or lighter image behind the title area.
                 </p>
               ) : null}
-              {upload.status === "error" ? (
+              {localError || upload.status === "error" ? (
                 <p className="text-caption text-danger" role="alert">
-                  {upload.message}
+                  {localError ?? (upload.status === "error" ? upload.message : null)}
                 </p>
               ) : null}
             </div>
