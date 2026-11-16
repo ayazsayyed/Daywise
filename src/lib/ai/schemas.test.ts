@@ -184,3 +184,22 @@ describe("provider-facing JSON schema", () => {
     expect(js.properties.days.minItems).toBeUndefined();
   });
 });
+
+describe("cover eyebrow (PDF cover)", () => {
+  it("accepts short lead-ins and tidies them", async () => {
+    const { sanitizeEyebrow } = await import("./schemas");
+    expect(sanitizeEyebrow("A winter journey through")).toBe("A winter journey through");
+    expect(sanitizeEyebrow("  a slow   week in. ")).toBe("A slow week in");
+  });
+
+  it("drops anything that breaks the rules instead of failing the draft", async () => {
+    const { sanitizeEyebrow, coverEyebrowSchema } = await import("./schemas");
+    expect(sanitizeEyebrow("An amazing six night winter journey through")).toBeNull(); // > 5 words
+    expect(sanitizeEyebrow("Best deal ever!")).toBeNull();
+    expect(sanitizeEyebrow("From ₹40,000 per person")).toBeNull();
+    expect(sanitizeEyebrow("7 nights in")).toBeNull();
+    expect(sanitizeEyebrow("")).toBeNull();
+    expect(sanitizeEyebrow(undefined)).toBeNull();
+    expect(coverEyebrowSchema.safeParse("A winter journey through").success).toBe(true);
+  });
+});

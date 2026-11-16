@@ -165,7 +165,9 @@ test("create tenant, open as it, return, delete it", async ({ page }) => {
   await page.goto(`/admin/t/${row!.id}`);
   await page.getByRole("button", { name: `Open as ${editedName}` }).click();
   await expect(page).toHaveURL(/\/app$/);
-  await expect(page.getByRole("status").filter({ hasText: "Viewing as" })).toContainText(editedName);
+  await expect(page.getByRole("status").filter({ hasText: "Viewing as" })).toContainText(
+    editedName,
+  );
   await page.getByRole("button", { name: "Return to admin" }).click();
   await expect(page).toHaveURL(/\/admin$/);
 

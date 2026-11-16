@@ -17,6 +17,7 @@ import {
   type PdfJobState,
   type ShareState,
 } from "./actions";
+import { CoverPhotoPicker } from "./cover-photo-picker";
 import { agentShareMessage, waHref } from "./whatsapp";
 
 /**
@@ -313,6 +314,7 @@ export function SharePanel({
                 )}
                 {pdfError ? <p className="text-body-sm text-danger mt-2">{pdfError}</p> : null}
               </div>
+              <CoverPhotoPicker itineraryId={target.id} />
             </section>
 
             {/* Activity (views counted once per hour per device; no scroll tracking) */}

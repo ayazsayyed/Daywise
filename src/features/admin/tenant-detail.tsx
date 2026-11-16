@@ -20,6 +20,7 @@ import {
 export function TenantSettingsForm({
   tenantId,
   initial,
+  pdfStyles,
 }: {
   tenantId: string;
   initial: {
@@ -30,7 +31,10 @@ export function TenantSettingsForm({
     dailyGenCap: number;
     monthlyAiCap: number;
     monthlyPdfCap: number;
+    pdfStyle: string;
   };
+  /** Built-in styles plus bespoke styles this tenant owns (src/features/pdf/styles/meta.ts). */
+  pdfStyles: { id: string; name: string }[];
 }) {
   const [state, action, pending] = useActionState<FormResult | null, FormData>(
     updateTenantSettings.bind(null, tenantId),
@@ -89,7 +93,7 @@ export function TenantSettingsForm({
           />
         </Field>
       </div>
-      <div className="grid gap-4 sm:grid-cols-[160px_1fr]">
+      <div className="grid gap-4 sm:grid-cols-[160px_200px_1fr]">
         <Field label="Plan" htmlFor="t-plan">
           <select
             id="t-plan"
@@ -99,6 +103,24 @@ export function TenantSettingsForm({
           >
             <option value="trial">Trial</option>
             <option value="standard">Standard</option>
+          </select>
+        </Field>
+        <Field
+          label="PDF style"
+          htmlFor="t-pdf-style"
+          hint="Bespoke styles appear only for the agency that owns them."
+        >
+          <select
+            id="t-pdf-style"
+            name="pdfStyle"
+            defaultValue={initial.pdfStyle}
+            className="border-line-strong bg-surface-raised text-body text-ink focus-ring h-10 rounded-md border px-3"
+          >
+            {pdfStyles.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
           </select>
         </Field>
         <Field label="Custom domain" htmlFor="t-domain" optional>

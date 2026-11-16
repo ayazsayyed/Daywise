@@ -12,7 +12,16 @@ import type { ShareDay, ShareView } from "./view";
  * 29–34 desktop). The PDF prints this same page (`print`): print-only blocks
  * use `hidden print:block`, interactive ones carry `data-noprint`.
  */
-export function SharePage({ view, print = false }: { view: ShareView; print?: boolean }) {
+export function SharePage({
+  view,
+  print = false,
+  pdfAccent,
+}: {
+  view: ShareView;
+  print?: boolean;
+  /** Editorial PDF: accent for rules and day numbers (print only). */
+  pdfAccent?: string;
+}) {
   const { agency } = view;
   const navDays: NavDay[] = view.days.map((d) => ({
     n: d.n,
@@ -26,8 +35,12 @@ export function SharePage({ view, print = false }: { view: ShareView; print?: bo
   return (
     <div
       className="share-root bg-paper text-ink min-h-dvh pb-24 md:pb-0"
-      style={tenantStyle(agency.accent)}
+      style={{
+        ...tenantStyle(agency.accent),
+        ...(print && pdfAccent ? { ["--pdf-accent-on-paper" as string]: pdfAccent } : {}),
+      }}
       data-print={print ? "1" : undefined}
+      data-pdf-accent={print && pdfAccent ? "1" : undefined}
     >
       {print ? <RunningFooter left={`${agency.name} · ${view.footerTitle}`} /> : null}
 
@@ -64,7 +77,7 @@ export function SharePage({ view, print = false }: { view: ShareView; print?: bo
             Itinerary · {view.printedOn}
           </div>
         </div>
-        <hr className="border-tenant/70 border-t" />
+        <hr className="share-rule border-tenant/70 border-t" />
       </header>
 
       <main className="share-main mx-auto max-w-[1104px] px-5 md:px-8">
@@ -226,7 +239,15 @@ export function SharePage({ view, print = false }: { view: ShareView; print?: bo
   );
 }
 
-function DaySection({ day, first, print }: { day: ShareDay; first: boolean; print: boolean }) {
+export function DaySection({
+  day,
+  first,
+  print,
+}: {
+  day: ShareDay;
+  first: boolean;
+  print: boolean;
+}) {
   return (
     <section
       id={day.anchor}
@@ -350,7 +371,7 @@ function HotelRows({
   );
 }
 
-function PriceBlock({ price }: { price: NonNullable<ShareView["price"]> }) {
+export function PriceBlock({ price }: { price: NonNullable<ShareView["price"]> }) {
   return (
     <div className="share-price border-line grid gap-6 border-b pb-8 md:grid-cols-2 md:gap-10 print:grid-cols-2 print:pb-5">
       <div>
@@ -390,7 +411,7 @@ function PriceBlock({ price }: { price: NonNullable<ShareView["price"]> }) {
   );
 }
 
-function Sections({ view, priced }: { view: ShareView; priced: boolean }) {
+export function Sections({ view, priced }: { view: ShareView; priced: boolean }) {
   const { included, excluded, payment, cancellation } = view.sections;
   const hasLists = included.length || excluded.length;
   const hasTerms = payment || cancellation;
@@ -449,12 +470,12 @@ function List({ title, items }: { title: string; items: string[] }) {
   );
 }
 
-function Footer({ view }: { view: ShareView }) {
+export function Footer({ view }: { view: ShareView }) {
   const { agency } = view;
   return (
     <footer id="contact" className="share-footer mt-16 pb-10 md:mt-24 print:pb-0">
-      <hr className="border-tenant/70 border-t" />
-      <div className="grid gap-8 pt-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] md:gap-12 print:grid-cols-[1fr_1.7fr]">
+      <hr className="share-rule border-tenant/70 border-t" />
+      <div className="grid gap-8 pt-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] md:gap-12 print:grid-cols-[minmax(0,1fr)_minmax(0,1.7fr)]">
         <div>
           <Wordmark agency={agency} />
           {agency.footer ? (

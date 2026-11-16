@@ -1,3 +1,4 @@
+import { sanitizeEyebrow } from "@/lib/ai/schemas";
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 
 import { type LearningCandidate, shouldRecordLearning } from "@/lib/ai/learning-policy";
@@ -143,6 +144,15 @@ export function itineraryRepo(tenantId: string, conn: Db) {
       return tree(conn, itineraryId);
     },
 
+    /** PDF cover photos chosen in the share panel; null = pick automatically. Keeps the eyebrow. */
+    async setCoverPhotos(itineraryId: string, photos: schema.ImageRef[] | null) {
+      const it = await own(conn, itineraryId);
+      await conn
+        .update(schema.itineraries)
+        .set({ cover: { eyebrow: it.cover?.eyebrow ?? null, photos }, updatedAt: new Date() })
+        .where(and(eq(schema.itineraries.id, it.id), eq(schema.itineraries.tenantId, tenantId)));
+    },
+
     /**
      * Applies an editor batch atomically. Ids are checked against this
      * itinerary before anything is written; `resolvePlace` turns a Places id
@@ -191,6 +201,19 @@ export function itineraryRepo(tenantId: string, conn: Db) {
                   .update(schema.itineraries)
                   .set(patch)
                   .where(eq(schema.itineraries.id, it.id));
+              break;
+            }
+            case "cover.set": {
+              const text = op.eyebrow.trim();
+              const eyebrow = text ? sanitizeEyebrow(text) : null;
+              if (text && !eyebrow)
+                throw new InvalidEditError(
+                  "Cover line: five words at most, no exclamation marks, digits or prices.",
+                );
+              await tx
+                .update(schema.itineraries)
+                .set({ cover: { photos: it.cover?.photos ?? null, eyebrow } })
+                .where(eq(schema.itineraries.id, it.id));
               break;
             }
             case "client.set":

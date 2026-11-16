@@ -99,4 +99,12 @@
   .share-root a {
     text-decoration: none !important;
   }
+
+  /* Editorial PDF style: accent on rules and day numbers (DESIGN.md Part 2 "PDF styles"). */
+  [data-pdf-accent] .share-rule {
+    border-color: var(--pdf-accent-on-paper) !important;
+  }
+  [data-pdf-accent] .share-day-head .text-tenant {
+    color: var(--pdf-accent-on-paper) !important;
+  }
 }

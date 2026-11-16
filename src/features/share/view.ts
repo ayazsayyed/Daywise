@@ -182,7 +182,10 @@ export function stockCredit(attribution: string | null | undefined): string | nu
   return a.replace(/^Photo:\s*/i, "");
 }
 
-function image(img: EditorImage | null | undefined, caption: string): ShareImage | null {
+export function shareImage(
+  img: EditorImage | null | undefined,
+  caption: string,
+): ShareImage | null {
   if (!img) return null;
   const google = img.source === "place";
   const credit = google
@@ -358,7 +361,7 @@ export function buildShareView(input: {
             eyebrow: `NIGHT ${night}${date ? ` · ${date}` : ""}`,
             name: d.hotel.name,
             area: hotelArea(d.hotel.address, city),
-            image: image(d.hotel.image, d.hotel.name),
+            image: shareImage(d.hotel.image, d.hotel.name),
             rows,
           } satisfies ShareHotel;
         })()
@@ -372,7 +375,7 @@ export function buildShareView(input: {
       dateLabel: d.date ? formatWeekdayDate(d.date) : "",
       title: d.title,
       city: d.city,
-      hero: image(d.hero, heroCaption(d)),
+      hero: shareImage(d.hero, heroCaption(d)),
       transport: d.transport,
       stops: d.stops.map((s) => ({
         time: formatClock(s.time),

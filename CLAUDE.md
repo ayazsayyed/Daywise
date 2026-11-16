@@ -17,7 +17,7 @@ You are the sole engineer. Product decisions are already made — read `docs/PRD
 - pg-boss for background jobs (generation, PDF). Worker = `src/worker/index.ts`, run as a separate process from the same codebase.
 - Vercel AI SDK (`ai`) with `generateObject` + zod schemas. Providers: Groq (`openai/gpt-oss-120b`) primary → Google Gemini Flash fallback. Provider chosen by `AI_PROVIDER` env; code must never import a provider directly outside `src/lib/ai/providers.ts`.
 - Auth: own magic-link implementation (table `login_tokens`, 15-min single-use, 30-day httpOnly session cookie). Resend for email. No Auth.js, no Supabase.
-- PDF: Playwright (Chromium) in the worker rendering `/s/[token]?print=1`.
+- PDF: Playwright (Chromium) in the worker. Editorial prints `/s/[token]?print=1`; other styles print `&part=cover|body|last` and the worker merges them with pdf-lib and stamps page numbers (`src/features/pdf/merge.ts`).
 - Files: Cloudflare R2 (S3 API) for tenant logos and nightly backups.
 - Caddy with on-demand TLS; Docker Compose (app, worker, postgres, caddy). GitHub Actions deploys over SSH on push to `main`.
 - Logging: pino. Errors: Sentry. Validation everywhere: zod.
@@ -30,6 +30,7 @@ You are the sole engineer. Product decisions are already made — read `docs/PRD
 - **Google Places:** Text Search field mask is exactly `places.id,places.displayName,places.formattedAddress,places.location,places.photos`. Never request rating/reviews (it re-prices the call). Store `place_id` and photo resource names, never photo bytes. Serve photos through `/api/photo/[ref]` with ≤30-day cache and max width 1200. Show author attribution wherever a Google photo is displayed. Hard monthly budget guard in `src/lib/places/budget.ts` — when exhausted, generation continues unverified and alerts via Sentry.
 - **Image fallback chain:** Place photo → Pexels/Wikimedia destination image (cacheable, stored in R2) → branded SVG placeholder. Every image record carries a `source` field.
 - **Share links:** unguessable 24+ char tokens, `noindex`, view tracking ignores known bot UAs. Disabled links render a friendly page with the agency's contact details. Suspended tenants: admin locked, links read-only for 30 days.
+- **PDF styles:** the PDF is generated from style + tenant brand tokens + itinerary data (`src/features/pdf/`); never accept uploaded page artwork. Every colour comes from `buildTokens` (contrast fallbacks included); the worker imports style metadata only (`styles/meta.ts`), never React or CSS. Bespoke styles are registered in `styles/meta.ts` with their owning tenant ids and only those tenants can select or render them. PDFs are never stored: bytes stay in `pdf_jobs` until the one download (deleted as it is handed over) or 10 minutes. Settings previews use the sample fixture, never tenant data, and do not count toward the PDF cap.
 - **Dates:** store UTC, display `DD MMM YYYY`, timezone Asia/Kolkata. Currency INR by default.
 - **Secrets:** only via env; `.env.example` is the contract. Never commit `.env`.
 - **No new infrastructure** (Redis, queues, external auth, serverless) without a note in STATUS.md and explicit approval.

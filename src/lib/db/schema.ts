@@ -103,6 +103,22 @@ const timestamps = {
 };
 
 // ── Tenancy ──────────────────────────────────────────────────────────────
+export type CoverBackdropMeta = {
+  w: number;
+  h: number;
+  bytes: number;
+  /** Text colour that reads best over the cover text region. */
+  text: "light" | "dark";
+  /** Contrast of that text against the region's mean colour; < 4.5 shows a warning. */
+  contrast: number;
+};
+
+export type ItineraryCover = {
+  eyebrow: string | null;
+  /** Agent override from the share panel; null = picked automatically at render time. */
+  photos: ImageRef[] | null;
+};
+
 export const tenants = pgTable("tenants", {
   id: uuid("id").primaryKey().defaultRandom(),
   slug: text("slug").notNull().unique(),
@@ -118,6 +134,16 @@ export const tenants = pgTable("tenants", {
   monthlyPdfCap: integer("monthly_pdf_cap").notNull().default(200),
   branding: jsonb("branding").$type<TenantBranding>().notNull(),
   defaults: jsonb("defaults").$type<TenantDefaults>().notNull(),
+  /** PDF style id from src/features/pdf/styles (built-in, or a bespoke id assigned in /admin). */
+  pdfStyle: text("pdf_style").notNull().default("editorial"),
+  /** Second brand colour for rules, eyebrows and flourishes; derived from theme_color by default. */
+  accentColor: text("accent_color"),
+  /** Cover title font: "inter" or "serif" (bundled Fraunces). */
+  titleFont: text("title_font").notNull().default("inter"),
+  /** R2 key of the optional cover backdrop (styles that support one). */
+  coverBackdropKey: text("cover_backdrop_key"),
+  /** Size and the text colour measured from the backdrop at upload (src/features/pdf/tokens.ts). */
+  coverBackdropMeta: jsonb("cover_backdrop_meta").$type<CoverBackdropMeta>(),
   ...timestamps,
 });
 
@@ -185,6 +211,8 @@ export const itineraries = pgTable(
     pricing: jsonb("pricing").$type<ItineraryPricing>(),
     sections: jsonb("sections").$type<ItinerarySections>(),
     isTemplate: boolean("is_template").notNull().default(false),
+    /** PDF cover: AI-written eyebrow and the agent's cover-photo choice (null = auto pick). */
+    cover: jsonb("cover").$type<ItineraryCover>(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     ...timestamps,
   },
@@ -306,9 +334,9 @@ export const pdfJobs = pgTable(
     tenantId: uuid("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
-    itineraryId: uuid("itinerary_id")
-      .notNull()
-      .references(() => itineraries.id, { onDelete: "cascade" }),
+    /** Null for a settings "Preview PDF" (sample fixture, not tenant data). */
+    itineraryId: uuid("itinerary_id").references(() => itineraries.id, { onDelete: "cascade" }),
+    preview: boolean("preview").notNull().default(false),
     /** queued | rendering | done | failed */
     status: text("status").notNull().default("queued"),
     pages: integer("pages"),

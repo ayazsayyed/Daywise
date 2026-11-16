@@ -3,7 +3,27 @@
 _Updated by Claude Code at the end of every session. Ayaz reads this + the live URL each evening._
 
 ## Current phase
-**Day 5 — hardening, super-admin, ops: built and deployed 12 Nov 2026** (live at https://daywise.smallsoftware.in). Acceptance below; two items wait on Ayaz (Places prod key, Sentry dashboard confirmation).
+**Generated PDF styles (approved improvement, 16 Nov 2026)** on top of Day 5 (live at https://daywise.smallsoftware.in). Details below; open questions under "Blocked / questions".
+
+## Done (16 Nov 2026) — Generated PDF styles
+Replaces the per-tenant stationery idea (artwork upload + zones). That approach was built locally, never committed or deployed, and has been removed; migration `0007` was rewritten instead of adding and dropping columns.
+- **Data** (migration `0007_pdf_styles`): `tenants.pdf_style` (default `editorial`), `accent_color` (backfilled by `pnpm db:migrate` with the derivation rule), `title_font`, `cover_backdrop_key` + `cover_backdrop_meta` (size and measured text colour/contrast; one column more than the brief listed, so the luminance check runs once at upload), `itineraries.cover` (eyebrow + agent's photo choice), `pdf_jobs.itinerary_id` nullable + `preview`
+- **Tokens** (`src/features/pdf/tokens.ts`): accent default gold `#C9A227` for dark/cool primaries, else the primary 32% darker; every printed pairing is checked and corrected automatically (4.5:1 text, 3:1 rules)
+- **Styles** (`src/features/pdf/styles/`): Editorial (the original single document, accent on rules and day numbers), Heritage (modelled on `cover-reference.png`), Photo-first, Minimal. Registry with bespoke styles gated to their owning tenants; `/admin/t/<id>` assigns a tenant's style
+- **Engine**: three print documents (`part=cover|body|last`), page margin 0 + repeating table spacers for the content box, pdf-lib merge, "Page NN of TT" stamped in Inter after the merge. The worker imports style metadata only. Settings "Preview PDF" prints the sample Kashmir fixture through the worker (`/s/preview/<tenantId>`, HMAC-signed, not counted in the PDF cap)
+- **AI**: generator writes `cover_eyebrow` (≤ 5 words, no exclamation marks, digits or money; anything else is dropped on save, never fails a draft); regenerate-day leaves it alone; editable in the editor above the title (`cover.set` op)
+- **Cover photos**: heuristic picks two landscape photos from two places, highest resolution, day photos before hotel photos; Pexels/Wikimedia destination photos as fallback; share panel → "Cover photos" lets the agent choose two or go back to automatic
+- **Settings → PDF**: style cards, accent (with suggested default), title font, backdrop upload (Heritage), live cover / inner / last preview, Preview PDF. Screenshots `docs/design/actual/15b-settings-pdf-1440.png`, `-390.png`. Fixed a horizontal overflow at 390 on the Settings page (grids now `minmax(0,1fr)`)
+- **Dev without R2 keys**: uploads go to `.data/r2/` (gitignored) when R2 is not configured outside production
+- **Fixed on the way**: Editorial's footer grid let a long agency name squeeze the contact table to one character per line (pre-existing; now `minmax(0,…)` columns)
+
+### Verification (local, `pnpm dev` + `pnpm worker`)
+- **Unit** (`pnpm check` green, 217 tests): token derivation and contrast fallbacks, backdrop text choice, photo picker heuristic and override, eyebrow schema/sanitising, registry gating (bespoke owned/unowned, fallback to Editorial, every style has components), page labels and stamp positions, merge (cover keeps page 1 only, stamps after the cover only)
+- **Golden renders**: 4 styles × {2, 5, 12 days} × {priced, hidden} = 24 PDFs from the sample fixture: no blank pages, every day present, terms and caption lines present, no price text in hidden PDFs, 0.23–0.81 MB, 1.1–12.7 s (dev server; most under 4 s). 5-day priced PDFs saved in `docs/design/actual/pdf/`. Pages: 2 days → 4, 5 days → 7, 12 days → 14 (Editorial 15: its cover's "Where you stay" list of 11 nights takes two pages, same as before styles)
+- **Edge cases**: 60-character title and 60-character agency name in every style → 7 pages each after the long-name fixes; missing photos (the fixture has none) → photo grounds with place names
+- **Editorial regression**: four itineraries (7-day Turkey with real photos; 12, 2 and 5-day mocks) printed by `main` and by this branch: same page counts, identical extracted text, sizes within 0.03%
+- **SKTW check**: SKTW tokens (primary `#134753` sampled from the reference, gold accent, Fraunces title, Heritage), 7-day Turkey generated with real AI + Places (hotels 6/6 verified, AI eyebrow "A winter journey through"), Akil Shaikh, 4 adults, ₹54,567: 9 pages (cover, one page per day, Price and terms), 3.1 MB, 7.7 s warm. Cover side by side with `cover-reference.png` on the GitHub issue (full PDF not posted: Google photos, public repo). Not done with the real backdrop: see Blocked
+- **e2e**: `share.spec.ts` gained "PDF style switch → a Heritage PDF renders through the worker" (settings save, real download, 4 pages, client page unchanged). Locally 7/7 pass warm; on cold dev compiles `share` (generate) and `admin › create tenant, open as it` each failed once and passed on rerun (timing, not assertions)
 
 ## Done (Day 5, 12 Nov 2026)
 ### Deploy loose ends
@@ -210,6 +230,9 @@ Official run (`pnpm gen`, final code):
 - Admin "AI calls" amber threshold uses `daily_gen_cap` as the monthly AI cap per deviation 4's mapping; rename the column when Day 5 touches caps
 
 ## Blocked / questions
+- **SKTW backdrop (Ayaz):** `docs/reference/sktw/pdf-template/backdrop.png` is the whole cover artwork (logo, "PRIVATE TRAVEL ITINERARY", photo frames, footer text). Heritage draws all of those itself, so as a backdrop it would print twice. Please export a clean backdrop: teal texture and the mosque silhouette only, no text or logos, 2480 × 3508 px (the file is 1055 × 1491, below the minimum; the earlier `cover.png` too). The backdrop mechanics were verified with a synthetic image
+- **SKTW logo:** not uploaded locally, so renders show the "SK" initials tile. Upload the logo in Settings on production; on Heritage's dark band a white or light logo reads best
+- **SKTW sample PDF not posted publicly:** the repo is public and the 7-day Turkey PDF has Google Places photos on its day pages (CLAUDE.md: never store photo bytes). The issue carries the cover side by side with the reference (its two cover photos are Pexels) and the fixture PDFs; to see the full Turkey PDF, set SKTW to Heritage on production and use Download PDF on any Turkey itinerary
 - **Production has no tenants (Ayaz, Day 6):** the restore check showed `tenants=0`: SKTW was never seeded on the server, only the superadmin login exists. Create SKTW from `/admin` → Create tenant (with the custom domain `itinerary.shreekrishnatravelworld.com` if wanted) instead of running the seed, which uses placeholder branding. Owner email gets a sign-in link
 - **#15 Places prod key (Ayaz):** Google Cloud → create `daywise-prod` (IP `200.141.14.237`, Places API (New) only) → add it as Actions secret `GOOGLE_PLACES_API_KEY_PROD` → Actions → Ops → `set-places-key`. Rename the current key `daywise-dev`, application restriction None, API restriction Places API (New). Steps in SETUP.md Part C. I have no Google Cloud credentials here
 - **Sentry arrival (Ayaz):** events were accepted by the SDK with ids `72c642749c2f443298c0abb8d803d13e` (worker) and `63c3cbcd3a2b45b5bc8873ed90277b9f` (app) plus the budget warning. I cannot read Sentry from here (the CI token is upload-only). Please confirm in the dashboard

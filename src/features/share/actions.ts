@@ -13,6 +13,9 @@ import { startOfMonthIST } from "@/lib/format";
 import { getBoss, QUEUES } from "@/lib/jobs/boss";
 import { logger } from "@/lib/logger";
 
+import { toEditorDoc } from "@/features/editor/load";
+import { coverCandidates, pickCoverPhotos, resolveOverride } from "@/features/pdf/cover-photos";
+
 import { shareUrl } from "./url";
 import { agentShareMessage, waHref } from "./whatsapp";
 
@@ -185,5 +188,72 @@ export async function quickShare(
     };
   } catch (err) {
     return fail(err, "quickShare failed");
+  }
+}
+
+export type CoverPhotoOption = {
+  source: "place" | "pexels" | "wikimedia";
+  ref: string;
+  url: string;
+  caption: string;
+  landscape: boolean | null;
+};
+
+export type CoverPhotos = {
+  options: CoverPhotoOption[];
+  /** Refs used now (agent's choice, or the automatic pick). */
+  selected: string[];
+  auto: boolean;
+};
+
+/** Share panel "Cover photos": every itinerary photo the cover may use, and the current pick. */
+export async function getCoverPhotos(itineraryId: string): Promise<Result<CoverPhotos>> {
+  try {
+    const { scope } = await scoped(itineraryId);
+    const tree = await scope.getItineraryTree(itineraryId);
+    const doc = toEditorDoc(tree);
+    const options = coverCandidates(doc).map((c) => ({
+      source: c.image.source as CoverPhotoOption["source"],
+      ref: c.image.ref,
+      url: c.image.url,
+      caption: c.caption,
+      landscape: c.image.width && c.image.height ? c.image.width >= c.image.height : null,
+    }));
+    const override = resolveOverride(doc, tree.cover?.photos);
+    const picked = override ?? pickCoverPhotos(doc);
+    return {
+      ok: true,
+      data: { options, selected: picked.map((c) => c.image.ref), auto: !override },
+    };
+  } catch (err) {
+    return fail(err, "getCoverPhotos failed");
+  }
+}
+
+/** Saves up to two cover photos (refs must belong to this itinerary); [] = automatic. */
+export async function setCoverPhotos(
+  itineraryId: string,
+  refs: string[],
+): Promise<Result<CoverPhotos>> {
+  try {
+    const { scope } = await scoped(itineraryId);
+    const clean = z.array(z.string().max(500)).max(2).parse(refs);
+    const tree = await scope.getItineraryTree(itineraryId);
+    const all = coverCandidates(toEditorDoc(tree));
+    const chosen = clean
+      .map((r) => all.find((c) => c.image.ref === r))
+      .filter((c): c is NonNullable<typeof c> => !!c)
+      .map(({ image }) => ({
+        source: image.source,
+        ref: image.ref,
+        attribution: image.attribution ?? null,
+        attribution_url: image.attribution_url ?? null,
+        width: image.width,
+        height: image.height,
+      }));
+    await scope.setCoverPhotos(itineraryId, chosen.length ? chosen : null);
+    return getCoverPhotos(itineraryId);
+  } catch (err) {
+    return fail(err, "setCoverPhotos failed");
   }
 }

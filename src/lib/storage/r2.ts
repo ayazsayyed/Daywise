@@ -6,12 +6,33 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+
 import { env } from "@/lib/env";
 
 let client: S3Client | undefined;
 
 export function r2Configured(): boolean {
   return Boolean(env.R2_ACCOUNT_ID && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY);
+}
+
+/**
+ * Development without R2 keys: objects live under `.data/r2/` in the checkout
+ * (gitignored). Never used in production, where R2 must be configured.
+ */
+const LOCAL_ROOT = join(process.cwd(), ".data", "r2");
+function isLocalStore(): boolean {
+  return !r2Configured() && env.NODE_ENV !== "production";
+}
+function localPath(key: string): string {
+  if (key.includes("..") || key.startsWith("/")) throw new Error("bad key");
+  return join(LOCAL_ROOT, key);
+}
+
+/** Uploads can be stored: R2 in production, R2 or the local folder in development. */
+export function storageReady(): boolean {
+  return r2Configured() || isLocalStore();
 }
 
 function r2(): S3Client {
@@ -30,6 +51,13 @@ export async function putObject(
   contentType: string,
   cacheControl = "public, max-age=31536000, immutable",
 ) {
+  if (isLocalStore()) {
+    const p = localPath(key);
+    await mkdir(dirname(p), { recursive: true });
+    await writeFile(p, body);
+    await writeFile(`${p}.type`, contentType);
+    return;
+  }
   await r2().send(
     new PutObjectCommand({
       Bucket: env.R2_BUCKET,
@@ -44,6 +72,15 @@ export async function putObject(
 export async function getObject(
   key: string,
 ): Promise<{ body: Uint8Array; contentType: string } | null> {
+  if (isLocalStore()) {
+    try {
+      const p = localPath(key);
+      const [body, contentType] = await Promise.all([readFile(p), readFile(`${p}.type`, "utf8")]);
+      return { body: new Uint8Array(body), contentType };
+    } catch {
+      return null;
+    }
+  }
   try {
     const res = await r2().send(new GetObjectCommand({ Bucket: env.R2_BUCKET, Key: key }));
     if (!res.Body) return null;
@@ -63,9 +100,28 @@ export function publicUrlFor(key: string): string {
   return `${base}/${key.split("/").map(encodeURIComponent).join("/")}`;
 }
 
+/** Deletes one object (missing is fine). */
+export async function deleteObject(key: string): Promise<void> {
+  if (isLocalStore()) {
+    const p = localPath(key);
+    await Promise.all([rm(p, { force: true }), rm(`${p}.type`, { force: true })]);
+    return;
+  }
+  await r2().send(
+    new DeleteObjectsCommand({
+      Bucket: env.R2_BUCKET,
+      Delete: { Objects: [{ Key: key }], Quiet: true },
+    }),
+  );
+}
+
 /** Deletes every object under a prefix (tenant delete). Returns the count. */
 export async function deletePrefix(prefix: string): Promise<number> {
   if (!prefix.endsWith("/")) throw new Error("prefix must end with /");
+  if (isLocalStore()) {
+    await rm(localPath(prefix), { recursive: true, force: true });
+    return 0;
+  }
   let deleted = 0;
   let token: string | undefined;
   do {

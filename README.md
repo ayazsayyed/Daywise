@@ -27,6 +27,31 @@ The same pipeline runs as the pg-boss job `generate-itinerary` in `pnpm worker`.
 `pnpm dev`, then `SESSION_TOKEN=$(pnpm exec tsx scripts/dev/mint-session.ts) node scripts/design-shots.mjs` writes
 every screen at 1440 and 390 to `docs/design/actual/` for comparison with `docs/design/screens/` (see `docs/DESIGN.md`).
 
+## PDF styles
+Tenants choose a PDF style in Settings → PDF (Editorial, Heritage, Photo-first, Minimal), an accent colour,
+the cover title font and, for Heritage, an optional cover backdrop (A4 portrait PNG/JPG, 2480 × 3508 px or larger,
+up to 8 MB, with no text or logos in it: Daywise draws those). Everything else is generated; see
+`docs/DESIGN.md` Part 2 "PDF styles".
+
+Dev helpers (never production):
+- `pnpm exec tsx scripts/dev/pdf-brand-set.ts sktw --style heritage --primary "#134753" --accent "#C9A227" --font serif [--backdrop file.png|none]`
+- `pnpm exec tsx scripts/dev/pdf-golden.ts sktw /tmp/golden` renders every style × 2/5/12 days × priced/hidden from the
+  sample fixture through the worker's code (needs `pnpm dev`); `--itinerary <id>` renders a real itinerary instead.
+- `pnpm exec tsx scripts/dev/pdf-regress.ts sktw /tmp/reg main=http://localhost:3102 branch=http://localhost:3000 -- <ids>`
+  prints the same itineraries as Editorial from two app origins for a before/after comparison.
+- `SESSION_TOKEN=… node scripts/dev/pdf-style-shots.mjs` screenshots Settings at 1440 and 390.
+
+### Bespoke PDF templates (paid add-on)
+**Pricing note:** a custom template is a one-time service, quoted per agency; the monthly price is unchanged.
+To build one for a tenant:
+1. Add `src/features/pdf/styles/bespoke/<id>.tsx` exporting `{ Cover, Chrome, Last }` (see `heritage.tsx`). Draw everything
+   from `PdfTokens` and `PdfView`, keep Inter for body text, 9pt minimum, credits on the last page, hotel cards unsplit.
+2. Add its metadata to `BESPOKE_META` in `src/features/pdf/styles/meta.ts` with the owning tenant ids
+   (`{ "<id>": { meta: { id, name, description, supportsBackdrop, singleDocument: false, insets, stamp }, tenantIds: ["<uuid>"] } }`)
+   and its components to `COMPONENTS` in `styles/index.ts`.
+3. Run `pdf-golden.ts --styles <id>` and check 2/5/12 days, hidden pricing and long names; push.
+4. In `/admin/t/<id>`, set **PDF style** to the bespoke id. Other tenants never see it, and an unowned id renders as Editorial.
+
 ## Checks
 `pnpm check` = typecheck + lint + unit tests (must pass before every push). `pnpm e2e` runs Playwright.
 

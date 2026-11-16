@@ -10,3 +10,6 @@ test-results
 .DS_Store
 tsconfig.tsbuildinfo
 next-env.d.ts
+
+# local object storage in development (src/lib/storage/r2.ts)
+.data/

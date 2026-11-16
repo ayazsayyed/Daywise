@@ -34,13 +34,16 @@ export async function GET(_req: Request, ctx: { params: Promise<{ jobId: string 
   if (!row?.pdf)
     return new NextResponse("This PDF has expired. Please prepare it again.", { status: 410 });
 
-  const it = await db.query.itineraries.findFirst({
-    columns: { title: true },
-    where: and(
-      eq(schema.itineraries.id, row.itineraryId),
-      eq(schema.itineraries.tenantId, session.tenant.id),
-    ),
-  });
+  // A settings "Preview PDF" has no itinerary (sample fixture).
+  const it = row.itineraryId
+    ? await db.query.itineraries.findFirst({
+        columns: { title: true },
+        where: and(
+          eq(schema.itineraries.id, row.itineraryId),
+          eq(schema.itineraries.tenantId, session.tenant.id),
+        ),
+      })
+    : { title: "PDF template preview" };
   const name = pdfFilename(it?.title ?? "itinerary");
   return new NextResponse(new Uint8Array(row.pdf), {
     headers: {

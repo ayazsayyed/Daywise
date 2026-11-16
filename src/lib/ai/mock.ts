@@ -204,6 +204,7 @@ export function mockItinerary(brief: Brief): ItineraryDraft {
 
   return {
     title: `${brief.destination} in ${total} days`,
+    cover_eyebrow: "A journey through",
     summary: `${brief.nights} nights across ${cities.join(", ")} at a ${brief.pace} pace, ${brief.budget} stays throughout.`,
     days,
     notes: ["Timings and sightseeing are subject to weather and local conditions."],

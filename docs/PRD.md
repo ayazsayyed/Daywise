@@ -1,4 +1,4 @@
-# Daywise — PRD v1.1 (finalised 9 Nov 2026)
+# Daywise — PRD v1.2 (finalised 9 Nov 2026; PDF styles added 16 Nov 2026)
 
 **Product:** Daywise — admin product brand; tenant branding appears only on client-facing output. Hosted at daywise.smallsoftware.in; tenants map a CNAME (e.g. itinerary.shreekrishnatravelworld.com).
 **One-liner:** A travel agent types "5-day Kashmir for a couple, mid-range"; Daywise drafts a verified, photo-rich, day-wise itinerary the agent edits and sends as a branded link or PDF in under 10 minutes.
@@ -16,7 +16,9 @@
 ## 2. Branding (set once per tenant)
 - Logo, theme colour, contact details (phone, WhatsApp, email, address), footer/T&Cs
 - Default inclusions, exclusions, payment terms, cancellation text — pre-filled per itinerary, editable
-- No other uploads: imagery from Google Places / Pexels / Wikimedia only
+- PDF brand tokens (approved improvement, 16 Nov 2026): **PDF style** (Editorial, Heritage, Photo-first, Minimal, or a bespoke style assigned in /admin), **accent colour** (default derived from the theme colour), **cover title font** (Inter or the bundled Fraunces serif). Daywise generates every PDF page from style + tokens + itinerary data; tenants never upload page artwork or set layout zones
+- Uploads: the logo, and one optional **cover backdrop** (PNG/JPG, A4 portrait, ≥ 2480 × 3508 px, ≤ 8 MB, R2) used only by styles that support it; Daywise measures it and picks light or dark cover text, warning below 4.5:1. All other imagery from Google Places / Pexels / Wikimedia
+- Bespoke PDF styles are a paid one-time service: coded per tenant and selectable only by that tenant
 
 ## 3. Generation
 - Free-text prompt (English or Hinglish) → prompt enhancer → structured brief: destination(s), nights, dates, pax (adults/children + ages), budget tier, pace, season, entry/exit city, must-sees
@@ -43,7 +45,9 @@
 ## 5. Sharing
 - Public read-only link, live-updating with "last updated" stamp, mobile-first, noindex, unguessable token; disable to expire
 - Disabled/expired link → friendly page with agency contact details
-- Branded PDF rendered on demand from the same template (not archived); photos resized via proxy (max 1200px); PDF target < 5 MB; Google photo attribution shown
+- Branded PDF rendered on demand (not archived) in the tenant's PDF style: Editorial prints the client page itself; the other styles print a generated cover, day pages and a "Price and terms" page, merged with page numbers. Photos resized via proxy (max 1200px); PDF target < 5 MB (styles under 1 MB with the sample, ~3 MB for a photo-rich 7-day trip); Google photo attribution shown on the cover and in the credit line
+- PDF cover: an AI-written eyebrow ("A winter journey through", ≤ 5 words, editable in the editor's title area) and two cover photos picked automatically from the itinerary's own photos (agent can choose them in the share panel), falling back to destination photos
+- Settings "Preview PDF" prints a sample Kashmir itinerary with the saved style; not counted in the PDF cap
 - WhatsApp share with pre-filled message; copy link; download PDF
 - View tracking: open count + last viewed, bots ignored
 - Status: Draft → Sent → Confirmed / Lost

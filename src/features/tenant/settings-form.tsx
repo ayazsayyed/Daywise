@@ -21,21 +21,35 @@ import {
   type UploadState,
 } from "./actions";
 import { BrandPreview } from "./brand-preview";
+import {
+  PdfBrandFields,
+  PdfStylePreview,
+  type BackdropInfo,
+  type PdfBrandValue,
+} from "@/features/pdf/brand-fields";
+import type { StyleMeta } from "@/features/pdf/styles/meta";
+import type { PdfView } from "@/features/pdf/view";
 
 type Props = {
   tenantName: string;
   branding: TenantBranding;
   defaults: TenantDefaults;
+  pdf: {
+    value: PdfBrandValue;
+    styles: StyleMeta[];
+    backdrop: BackdropInfo;
+    sample: PdfView;
+  };
 };
 
 const HEX = /^#([0-9a-fA-F]{6})$/;
 const FORM_ID = "agency-settings";
 
 /** PNG 15: two-column form with section labels in the left gutter, live preview on the right. */
-export function SettingsForm({ tenantName, branding, defaults }: Props) {
+export function SettingsForm({ tenantName, branding, defaults, pdf }: Props) {
   const initial = useMemo(
-    () => ({ name: tenantName, ...branding, ...defaults }),
-    [tenantName, branding, defaults],
+    () => ({ name: tenantName, ...branding, ...defaults, ...pdf.value }),
+    [tenantName, branding, defaults, pdf.value],
   );
   const [form, setForm] = useState(initial);
   const [saveState, saveAction, saving] = useActionState<Save, FormData>(saveSettings, {
@@ -91,7 +105,7 @@ export function SettingsForm({ tenantName, branding, defaults }: Props) {
         </Button>
       </TopBarAction>
 
-      <div className="border-line mt-8 grid gap-16 border-t xl:grid-cols-[minmax(0,1fr)_424px]">
+      <div className="border-line mt-8 grid grid-cols-[minmax(0,1fr)] gap-16 border-t xl:grid-cols-[minmax(0,1fr)_424px]">
         <form id={FORM_ID} action={saveAction} className="divide-line flex flex-col divide-y">
           {/* Brand */}
           <Section title="Brand" description="Shown at the top of the client page and the PDF.">
@@ -224,6 +238,24 @@ export function SettingsForm({ tenantName, branding, defaults }: Props) {
                 </p>
               )}
             </div>
+          </Section>
+
+          {/* PDF */}
+          <Section
+            title="PDF"
+            description="How the downloadable PDF looks. Daywise draws every page from your brand; nothing to design."
+          >
+            <PdfBrandFields
+              value={{
+                pdf_style: form.pdf_style,
+                accent_color: form.accent_color,
+                title_font: form.title_font,
+              }}
+              onChange={(next) => setForm((f) => ({ ...f, ...next }))}
+              styles={pdf.styles}
+              themeColor={themeValid ? form.theme_color : "#2E3A8C"}
+              backdrop={pdf.backdrop}
+            />
           </Section>
 
           {/* Contact details */}
@@ -451,6 +483,32 @@ export function SettingsForm({ tenantName, branding, defaults }: Props) {
           <p className="text-caption text-ink-muted mt-3">
             Updates as you type. The full client page is designed separately.
           </p>
+          <div className="mt-10">
+            <PdfStylePreview
+              value={{
+                pdf_style: form.pdf_style,
+                accent_color: form.accent_color,
+                title_font: form.title_font,
+              }}
+              styles={pdf.styles}
+              themeColor={themeValid ? form.theme_color : "#2E3A8C"}
+              backdrop={pdf.backdrop}
+              sample={{
+                ...pdf.sample,
+                share: {
+                  ...pdf.sample.share,
+                  agency: {
+                    ...pdf.sample.share.agency,
+                    name: form.name || pdf.sample.share.agency.name,
+                    tagline: form.tagline,
+                    logoUrl: form.logo_url,
+                    website: form.website.replace(/^https?:\/\//, ""),
+                    footer: form.footer,
+                  },
+                },
+              }}
+            />
+          </div>
         </aside>
       </div>
     </>
@@ -472,7 +530,7 @@ function Section({
     <section
       aria-label={title}
       className={cn(
-        "grid gap-6 py-8 lg:grid-cols-[200px_minmax(0,560px)] lg:py-10",
+        "grid grid-cols-[minmax(0,1fr)] gap-6 py-8 lg:grid-cols-[200px_minmax(0,560px)] lg:py-10",
         last && "pb-0",
       )}
     >

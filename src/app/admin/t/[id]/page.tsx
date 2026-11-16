@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { loginAsTenant, unsuspendTenant } from "@/features/admin/actions";
 import { loadTenantDetail } from "@/features/admin/data";
 import { CnameChecker, DeleteTenant, TenantSettingsForm } from "@/features/admin/tenant-detail";
+import { isBespokeId, stylesForTenant } from "@/features/pdf/styles/meta";
 import { tenantSubdomain } from "@/lib/config/brand";
 import { SUSPENDED_GRACE_DAYS } from "@/lib/db/share";
 import { formatDate, formatMonthYear, formatNumber, formatTime } from "@/lib/format";
@@ -98,7 +99,12 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
               dailyGenCap: t.dailyGenCap,
               monthlyAiCap: t.monthlyAiCap,
               monthlyPdfCap: t.monthlyPdfCap,
+              pdfStyle: t.pdfStyle,
             }}
+            pdfStyles={stylesForTenant(t.id).map((s) => ({
+              id: s.id,
+              name: isBespokeId(s.id) ? `${s.name} (bespoke)` : s.name,
+            }))}
           />
         </Section>
 

@@ -22,7 +22,13 @@ describe("adminHostRedirect (#20)", () => {
   it("never redirects the server's own internal requests (server-action redirect render)", () => {
     // Next renders a server action's redirect target by fetching itself on its
     // listen address; bouncing that to APP_URL drops the session cookie.
-    for (const h of ["localhost:3000", "0.0.0.0:3000", "127.0.0.1:3000", "app:3000", "172.18.0.5:3000"])
+    for (const h of [
+      "localhost:3000",
+      "0.0.0.0:3000",
+      "127.0.0.1:3000",
+      "app:3000",
+      "172.18.0.5:3000",
+    ])
       expect(adminHostRedirect(h, "/app", "", APP)).toBeNull();
   });
 
@@ -32,7 +38,13 @@ describe("adminHostRedirect (#20)", () => {
   });
 
   it("leaves share pages, APIs and static files on the tenant host", () => {
-    for (const p of ["/s/tok", "/api/photo/x", "/api/health", "/_next/static/a.js", "/placeholder.svg"])
+    for (const p of [
+      "/s/tok",
+      "/api/photo/x",
+      "/api/health",
+      "/_next/static/a.js",
+      "/placeholder.svg",
+    ])
       expect(adminHostRedirect(SUB, p, "", APP)).toBeNull();
   });
 

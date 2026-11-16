@@ -6,9 +6,12 @@ import { z } from "zod";
 import { requireTenant } from "@/lib/auth/guards";
 import { darkenToReadable, isHex, readableOnSurface } from "@/lib/color";
 import { tenantBrandingSchema, tenantDefaultsSchema } from "@/lib/db/json";
+import { canUseStyle } from "@/features/pdf/styles/meta";
+import { deriveAccent } from "@/features/pdf/tokens";
 import { tenantScope } from "@/lib/db/tenant";
 import { logger } from "@/lib/logger";
-import { publicUrlFor, putObject, r2Configured } from "@/lib/storage/r2";
+import { publicUrlFor, putObject, storageReady } from "@/lib/storage/r2";
+import { sniffImage } from "@/lib/upload/sniff";
 
 export type SaveState =
   | { status: "idle" }
@@ -32,6 +35,9 @@ const settingsFormSchema = z.object({
   exclusions: z.string(),
   payment_terms: z.string(),
   cancellation: z.string(),
+  accent_color: z.string().trim().default(""),
+  pdf_style: z.string().trim().default("editorial"),
+  title_font: z.string().trim().default("inter"),
 });
 
 export async function saveSettings(_prev: SaveState, formData: FormData): Promise<SaveState> {
@@ -95,8 +101,19 @@ export async function saveSettings(_prev: SaveState, formData: FormData): Promis
     };
   }
 
+  if (f.accent_color && !isHex(f.accent_color))
+    return { status: "error", message: "Use a 6-digit hex like #C9A227.", field: "accent_color" };
+  if (!canUseStyle(f.pdf_style, session.tenant.id))
+    return { status: "error", message: "Choose one of the PDF styles shown.", field: "pdf_style" };
+
   try {
     if (f.name !== session.tenant.name) await scope.updateName(f.name);
+    await scope.updatePdfBrand({
+      pdfStyle: f.pdf_style,
+      // Empty = derive from the theme colour (stored, so the PDF never guesses).
+      accentColor: f.accent_color ? f.accent_color.toUpperCase() : deriveAccent(f.theme_color),
+      titleFont: f.title_font === "serif" ? "serif" : "inter",
+    });
     await scope.updateBranding(branding.data);
     await scope.updateDefaults(defaults.data);
     await scope.audit("tenant.settings.update", {
@@ -139,22 +156,14 @@ export async function uploadLogo(_prev: UploadState, formData: FormData): Promis
 
   const bytes = Buffer.from(await file.arrayBuffer());
   // Sniff the real content, not just the declared type.
-  const isPng = bytes
-    .subarray(0, 8)
-    .equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
-  const isJpg = bytes.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]));
-  const head = bytes.subarray(0, 512).toString("utf8").trimStart().toLowerCase();
-  const isSvg = head.startsWith("<svg") || (head.startsWith("<?xml") && head.includes("<svg"));
-  const looksRight =
-    (ext === "png" && isPng) || (ext === "jpg" && isJpg) || (ext === "svg" && isSvg);
-  if (!looksRight) {
+  if (sniffImage(bytes) !== ext) {
     return { status: "error", message: "That file does not look like a valid PNG, SVG or JPG." };
   }
   if (ext === "svg" && /<script|on\w+\s*=|javascript:/i.test(bytes.toString("utf8"))) {
     return { status: "error", message: "SVG logos must not contain scripts or event handlers." };
   }
 
-  if (!r2Configured())
+  if (!storageReady())
     return { status: "error", message: "File storage (R2) is not configured on this server." };
 
   try {

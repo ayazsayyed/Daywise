@@ -29,14 +29,14 @@ function remember(token: string, agency: ShareAgency) {
   lastAgency.set(token, agency);
 }
 
-function agencyOf(tenant: ShareTenant, title = ""): ShareAgency {
+export function agencyOf(tenant: ShareTenant, title = ""): ShareAgency {
   const parsed = tenantBrandingSchema.safeParse(tenant.branding);
   const branding = parsed.success ? parsed.data : { ...DEFAULT_BRANDING, ...tenant.branding };
   return buildAgency(tenant.name, branding, title);
 }
 
 /** Print: photos at the PDF re-encode targets (hero 1200 q72, hotel 800 q70). */
-function printPhotos(doc: EditorDoc): EditorDoc {
+export function printPhotos(doc: EditorDoc): EditorDoc {
   return {
     ...doc,
     days: doc.days.map((d) => ({

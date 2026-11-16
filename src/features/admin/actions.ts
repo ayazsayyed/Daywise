@@ -1,5 +1,6 @@
 "use server";
 
+import { canUseStyle } from "@/features/pdf/styles/meta";
 import { Resolver } from "node:dns/promises";
 
 import { and, eq, ne, sql } from "drizzle-orm";
@@ -199,6 +200,7 @@ export async function updateTenantSettings(
       slug: createSchema.shape.slug,
       plan: z.enum(["trial", "standard"]),
       customDomain: createSchema.shape.customDomain,
+      pdfStyle: z.string().trim().min(1).max(60),
     })
     .safeParse(Object.fromEntries(form));
   if (!parsed.success)
@@ -218,6 +220,9 @@ export async function updateTenantSettings(
     });
     if (clash) return { ok: false, message: "Another agency uses that domain" };
   }
+  // Bespoke styles are assignable only to the tenants that own them.
+  if (!canUseStyle(v.pdfStyle, tenant.id))
+    return { ok: false, message: "That PDF style is not available for this agency" };
   const status =
     tenant.status === "suspended" ? "suspended" : v.plan === "trial" ? "trial" : "active";
   await db
@@ -231,6 +236,7 @@ export async function updateTenantSettings(
       plan: v.plan,
       status,
       customDomain: v.customDomain || null,
+      pdfStyle: v.pdfStyle,
       updatedAt: new Date(),
     })
     .where(eq(schema.tenants.id, tenant.id));
@@ -248,6 +254,7 @@ export async function updateTenantSettings(
         monthlyPdfCap: tenant.monthlyPdfCap,
         plan: tenant.plan,
         customDomain: tenant.customDomain,
+        pdfStyle: tenant.pdfStyle,
       },
       after: { ...v, customDomain: v.customDomain || null },
     },

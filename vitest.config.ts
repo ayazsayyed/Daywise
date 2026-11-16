@@ -2,6 +2,8 @@ import { defineConfig } from "vitest/config";
 import path from "node:path";
 
 export default defineConfig({
+  // tsconfig keeps JSX for Next; tests that import components (PDF styles) need it compiled.
+  oxc: { jsx: { runtime: "automatic" } },
   test: {
     include: ["src/**/*.test.ts"],
     environment: "node",

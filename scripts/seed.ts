@@ -2,6 +2,7 @@ import "./load-env";
 import { eq, sql } from "drizzle-orm";
 
 import { closeDb, db, schema } from "@/lib/db";
+import { deriveAccent } from "@/features/pdf/tokens";
 import { DEFAULT_BRANDING, DEFAULT_DEFAULTS } from "@/lib/db/json";
 
 /**
@@ -31,6 +32,7 @@ async function main() {
         customDomain: "itinerary.shreekrishnatravelworld.com",
         plan: "standard",
         dailyGenCap: 50,
+        accentColor: deriveAccent("#1E6FB8"),
         branding: {
           ...DEFAULT_BRANDING,
           theme_color: "#1E6FB8",

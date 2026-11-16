@@ -71,7 +71,8 @@ export async function handleRegenerateDay(data: GenerateJobData): Promise<void> 
     await update({ status: "verifying", progress });
     t = Date.now();
     const verified = await verifyItinerary(
-      { title: tree.title, summary: "", notes: [], days: [day] },
+      // Regenerate-day never touches the cover eyebrow (only the day is saved).
+      { title: tree.title, cover_eyebrow: "", summary: "", notes: [], days: [day] },
       brief,
       job.tenantId,
       tenant.branding.theme_color,

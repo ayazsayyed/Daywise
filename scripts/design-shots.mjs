@@ -103,7 +103,12 @@ if (ID) {
     );
     await page.locator("[role=listbox]").scrollIntoViewIfNeeded();
   };
-  await shoot("13-editor-swap-1440", `/app/i/${ID}`, { ...D, authed: true, full: false, before: swap });
+  await shoot("13-editor-swap-1440", `/app/i/${ID}`, {
+    ...D,
+    authed: true,
+    full: false,
+    before: swap,
+  });
 }
 
 await browser.close();

@@ -115,6 +115,7 @@ describe("hotel candidates (#13)", () => {
     });
     const draft = {
       title: "Kashmir",
+      cover_eyebrow: "A spring journey through",
       summary: "Two days in Srinagar.",
       notes: ["Timings and sightseeing are subject to weather and local conditions."],
       days: [

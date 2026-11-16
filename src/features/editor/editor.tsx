@@ -306,6 +306,14 @@ export function Editor({
               </SectionLabel>
               {doc.isTemplate && <NeutralBadge className="w-fit">Template</NeutralBadge>}
               <InlineText
+                value={doc.coverEyebrow ?? ""}
+                label="Cover line on the PDF"
+                placeholder="Cover line, e.g. A winter journey through"
+                maxLength={48}
+                onChange={(v) => dispatch({ op: "cover.set", eyebrow: v })}
+                className="text-label text-ink-secondary"
+              />
+              <InlineText
                 multiline
                 value={doc.title}
                 label="Itinerary title"

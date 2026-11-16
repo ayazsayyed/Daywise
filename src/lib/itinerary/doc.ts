@@ -89,6 +89,8 @@ export type EditorDoc = {
   pricing: Pricing;
   sections: EditorSections;
   days: EditorDay[];
+  /** PDF cover eyebrow ("A winter journey through"); null = the default line. */
+  coverEyebrow?: string | null;
 };
 
 // ── Ops ──────────────────────────────────────────────────────────────────
@@ -140,6 +142,8 @@ export const editorOpSchema = z.discriminatedUnion("op", [
     startDate: isoDate.nullable().optional(),
   }),
   z.object({ op: z.literal("client.set"), client: clientSchema.nullable() }),
+  /** PDF cover eyebrow; "" clears it. Strict rules are checked server-side (sanitizeEyebrow). */
+  z.object({ op: z.literal("cover.set"), eyebrow: z.string().max(48) }),
   z.object({ op: z.literal("pricing.set"), pricing: pricingSchema }),
   z.object({ op: z.literal("sections.set"), sections: sectionsSchema }),
   z.object({
@@ -251,6 +255,8 @@ export function coalesceKey(op: EditorOp): string | null {
   switch (op.op) {
     case "itinerary.set":
       return "itinerary";
+    case "cover.set":
+      return "cover";
     case "client.set":
     case "pricing.set":
     case "sections.set":
@@ -307,6 +313,8 @@ export function applyOp(doc: EditorDoc, op: EditorOp): EditorDoc {
     }
     case "client.set":
       return { ...doc, client: op.client };
+    case "cover.set":
+      return { ...doc, coverEyebrow: op.eyebrow };
     case "pricing.set":
       return { ...doc, pricing: op.pricing };
     case "sections.set":

@@ -19,7 +19,12 @@ const SESSION_COOKIE = "dw_session";
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  const toApp = adminHostRedirect(req.headers.get("host"), pathname, req.nextUrl.search, env.APP_URL);
+  const toApp = adminHostRedirect(
+    req.headers.get("host"),
+    pathname,
+    req.nextUrl.search,
+    env.APP_URL,
+  );
   if (toApp) return NextResponse.redirect(toApp, 308);
 
   if (pathname.startsWith("/s/") || pathname.startsWith("/api/photo/")) {

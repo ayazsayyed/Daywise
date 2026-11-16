@@ -24,6 +24,7 @@ export function toEditorDoc(tree: ItineraryTree): EditorDoc {
     title: tree.title,
     status: tree.status,
     isTemplate: tree.isTemplate,
+    coverEyebrow: tree.cover?.eyebrow ?? null,
     startDate: tree.startDate,
     endDate: tree.endDate,
     destination: brief?.destination ?? String(raw.destination ?? ""),

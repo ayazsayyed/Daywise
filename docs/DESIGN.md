@@ -148,6 +148,32 @@ Trip title 34/38 mobile · 52/56 desktop · 600 · -0.026em. Day title 22/28 · 
 - No buttons, no links styled as buttons; phone numbers printed in full. Tenant colour only on wordmark, cover rule, day numbers.
 - Photos re-encoded to print-photo targets through the proxy; a 5-day PDF lands around 1.6 MB.
 
+## PDF styles (approved 16 Nov 2026; supersedes the stationery idea)
+The PDF is generated, never uploaded: **style + tenant brand tokens + itinerary data**. The rules in "PDF" above stay the Editorial style and the floor for every style.
+
+**Tokens** (`src/features/pdf/tokens.ts`; every pairing checked, never ship unreadable text)
+| Token | Source | Guarantee |
+|---|---|---|
+| primary | theme colour (Settings) | text on it is white or ink, whichever reaches 4.5:1 |
+| accent | Settings → PDF; default `#C9A227` gold when primary is dark or cool (luminance < 0.12, or hue 150–290°), else primary darkened 32% | `accentOnPrimary` ≥ 4.5:1 on the band, `accentOnPaper` ≥ 3:1 for rules and day numbers, `accentTextOnPaper` ≥ 4.5:1 for small text; moved toward white/black automatically |
+| title font | Inter or Fraunces 600 (self-hosted, OFL) | serif only in the cover/terms title slot; everything else Inter |
+| backdrop | optional upload (Heritage only) | mean colour of the cover text region (top 45%, left 75%) picks light/dark cover text; Settings warns below 4.5:1 |
+| paper / cream / ink | #FFFFFF / #F6F0E4 / #1C1B19, ink-secondary #5E5B55 | — |
+
+**The four styles** (`src/features/pdf/styles/`; metadata in `meta.ts`, React in `<id>.tsx`)
+1. **Editorial**: the original PDF above, printed through the single client-page document (page count and text identical to before styles); accent on the header/footer rules and day numbers. No backdrop.
+2. **Heritage** (model: `docs/reference/sktw/pdf-template/cover-reference.png`): full-bleed primary band with a radial vignette (or the backdrop); top row logo lockup · accent vertical rule · "PRIVATE TRAVEL ITINERARY • <year>"; accent eyebrow; very large title in the title font with an accent hairline flourish; "Prepared especially for <client>"; route "A — B — C" letterspaced between accent rules; a slanted two-photo band (top edge rising ~5°, diagonal accent hairline between photos) bleeding into cream; three meta cells with line icons (Travel dates, Duration, Travellers) between hairlines; accent rule; summary in italic; footer strip "<AGENCY> • <TAGLINE>" · website · "01". Inner pages: primary header band with a curved cream edge and accent hairline (SVG), footer strip "<Agency> · <Trip title>" and "Page 02 of 17". Last page: "Price and terms" in the title font, price in a primary block with an accent corner, Included / Not included / Payment / Cancellation with line icons, contact card on a soft panel with the logo monogram, captions and credits.
+3. **Photo-first**: one full-bleed cover photo with a bottom scrim and the text block over it; inner pages a thin accent rule and running header; page number centred.
+4. **Minimal**: typographic cover on white (logo, accent eyebrow and rule, title, meta grid, route, summary, contact line); thin header/footer lines inside.
+
+**Every style**: Inter except the title slot; all colours from tokens; hotel cards and stop rows never split; one day per page where it fits (print-fit narrows heroes as before); credits always on the last page (cover-photo credits also on the cover); 9pt minimum; no Daywise branding; no buttons. Checked with 2, 5 and 12 days, hidden pricing, missing photos, a 60-character title and a 60-character agency name.
+
+**Engine**: three print documents (`/s/<token>?print=1&sig=…&part=cover|body|last`), page margin 0 so chrome bleeds; content kept inside the style's insets by repeating table header/footer spacers; the worker keeps the cover's first page, merges with pdf-lib and stamps "Page NN of TT" (Inter, 9pt) on every page after the cover.
+
+**What agents can change**: style, accent, title font and backdrop in Settings (with a live cover / inner / last preview and "Preview PDF"); the cover eyebrow in the editor's title area (≤ 5 words, no exclamation marks, digits or money); the two cover photos in the share panel ("Cover photos", or automatic: landscape, two different places, highest resolution, day photos before hotel photos, destination photos as fallback).
+
+**Agreed deviations for PDF styles only**: the Heritage summary is italic and the Photo-first cover puts text over a photo with a gradient scrim. Both are PDF-only exceptions to the admin "never do" list, and the client page is unchanged. "Preview PDF" in Settings is a secondary button because "Save changes" is already the one primary.
+
 ## Agreed deviations from the client PDFs
 1. **Photo captions appear once, under the frame.** The mockups show the caption both inside and under the photo; that is a rendering duplicate. Client page and PDF: caption under only. (Admin keeps caption inside the frame.)
 2. **Photo credit line must satisfy Google's attribution terms.** Render "Photos: Google Maps contributors · <authorAttributions displayName, comma-separated>" rather than listing hotel names. Pexels photos add "· <photographer> / Pexels". Keep it at print-caption size.

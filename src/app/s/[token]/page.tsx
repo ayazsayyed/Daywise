@@ -3,6 +3,9 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
 
+import { isPrintPart } from "@/features/pdf/geometry";
+import { loadPdfByToken } from "@/features/pdf/load";
+import { PdfPartPage } from "@/features/pdf/part-page";
 import { loadShare } from "@/features/share/load";
 import { validPrintSignature } from "@/features/share/print-sign";
 import { SharePage } from "@/features/share/share-page";
@@ -16,7 +19,7 @@ export const dynamic = "force-dynamic";
 
 type Props = {
   params: Promise<{ token: string }>;
-  searchParams: Promise<{ print?: string; sig?: string }>;
+  searchParams: Promise<{ print?: string; sig?: string; part?: string }>;
 };
 
 /**
@@ -48,6 +51,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ShareRoute({ params, searchParams }: Props) {
   const [{ token }, sp] = await Promise.all([params, searchParams]);
   const print = sp.print === "1" && validPrintSignature(token, sp.sig, env.SESSION_SECRET);
+
+  // Generated PDF styles: one of the three print documents (worker only, signed).
+  if (print && isPrintPart(sp.part)) {
+    const pdf = await loadPdfByToken(token);
+    if (!pdf) notFound();
+    return <PdfPartPage part={sp.part} style={pdf.style} view={pdf.view} tokens={pdf.tokens} />;
+  }
+
   const res = await loadShare(token, print);
 
   if (res.kind === "not_found") notFound();
@@ -69,5 +80,10 @@ export default async function ShareRoute({ params, searchParams }: Props) {
     }
   }
 
-  return <SharePage view={res.view} print={print} />;
+  if (print) {
+    // Editorial (single document): accent on rules and day numbers.
+    const pdf = await loadPdfByToken(token);
+    return <SharePage view={res.view} print pdfAccent={pdf?.tokens.accentOnPaper} />;
+  }
+  return <SharePage view={res.view} />;
 }

@@ -1,3 +1,6 @@
+import { TITLE_FONTS } from "@/features/pdf/constants";
+import { canUseStyle } from "@/features/pdf/styles/meta";
+import { sanitizeEyebrow } from "@/lib/ai/schemas";
 import { and, eq, isNull, type SQL } from "drizzle-orm";
 import { z } from "zod";
 
@@ -90,6 +93,43 @@ export function tenantScope(tenantId: string, conn: Db = db) {
       return row;
     },
 
+    /** PDF brand tokens (Settings → Branding). Bespoke styles only for the tenants that own them. */
+    async updatePdfBrand(input: {
+      pdfStyle: string;
+      accentColor: string | null;
+      titleFont: string;
+    }) {
+      const v = z
+        .object({
+          pdfStyle: z.string().min(1).max(60),
+          accentColor: z
+            .string()
+            .regex(/^#[0-9A-Fa-f]{6}$/)
+            .nullable(),
+          titleFont: z.enum(TITLE_FONTS),
+        })
+        .parse(input);
+      if (!canUseStyle(v.pdfStyle, id)) throw new TenantIsolationError("Style not available");
+      const [row] = await conn
+        .update(schema.tenants)
+        .set({ ...v, accentColor: v.accentColor?.toUpperCase() ?? null, updatedAt: new Date() })
+        .where(eq(schema.tenants.id, id))
+        .returning();
+      if (!row) throw new TenantIsolationError("Tenant not found");
+      return row;
+    },
+
+    /** Cover backdrop (key + measured meta); null removes it. */
+    async setCoverBackdrop(key: string | null, meta: schema.CoverBackdropMeta | null) {
+      const [row] = await conn
+        .update(schema.tenants)
+        .set({ coverBackdropKey: key, coverBackdropMeta: meta, updatedAt: new Date() })
+        .where(eq(schema.tenants.id, id))
+        .returning();
+      if (!row) throw new TenantIsolationError("Tenant not found");
+      return row;
+    },
+
     async updateDefaults(input: unknown) {
       const defaults = tenantDefaultsSchema.parse(input);
       const [row] = await conn
@@ -147,6 +187,7 @@ export function tenantScope(tenantId: string, conn: Db = db) {
               currency: brief.currency,
             },
             sections: { ...input.defaults },
+            cover: { eyebrow: sanitizeEyebrow(itinerary.cover_eyebrow), photos: null },
           })
           .returning();
         if (!row) throw new Error("insert itinerary failed");

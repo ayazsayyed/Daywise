@@ -151,9 +151,34 @@ export const daySchema = z
   })
   .strict();
 
+/**
+ * PDF cover eyebrow (Part 2 "PDF styles"): ≤ 5 words, no exclamation mark,
+ * no digits or currency, e.g. "A winter journey through". Checked when the
+ * draft is saved; anything that fails is dropped (the cover then reads
+ * "A journey through"), never a reason to fail the whole generation.
+ */
+export const coverEyebrowSchema = z
+  .string()
+  .trim()
+  .min(3)
+  .max(48)
+  .refine((v) => v.split(/\s+/).length <= 5, "Five words at most")
+  .refine((v) => !/[!₹$€£\d]/.test(v), "No exclamation marks, digits or money");
+
+export function sanitizeEyebrow(value: unknown): string | null {
+  const r = coverEyebrowSchema.safeParse(
+    typeof value === "string" ? value.replace(/\s+/g, " ") : value,
+  );
+  if (!r.success) return null;
+  const v = r.data.replace(/[.:;,]+$/, "");
+  return v.charAt(0).toUpperCase() + v.slice(1);
+}
+
 export const itineraryDraftSchema = z
   .object({
     title: cleanText(80).refine((t) => t.length >= 4),
+    /** PDF cover eyebrow; no limits here so it can never fail a draft — sanitizeEyebrow checks it on save. */
+    cover_eyebrow: z.string(),
     summary: cleanText(500),
     // No min/max here: Gemini rejects maxItems on this array ("invalid argument").
     // The exact count (nights + 1, nights ≤ 30) is enforced by itinerarySchemaFor.

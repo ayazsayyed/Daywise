@@ -1,6 +1,7 @@
 import { devices, expect, test } from "@playwright/test";
 
 import {
+  createTestItinerary,
   createTestTenant,
   deleteStaleTestTenants,
   deleteTenants,
@@ -103,4 +104,61 @@ test("unknown token shows the calm unavailable page, unbranded", async ({ page }
     "This itinerary is no longer available",
   );
   await expect(page.locator("body")).not.toContainText("Daywise");
+});
+
+test("PDF style switch → a Heritage PDF renders through the worker", async ({ page }) => {
+  test.setTimeout(150_000);
+  requireDb();
+  const it = await createTestItinerary(tenant.id, "E2E Heritage trip");
+  await signIn(page, tenant.email, /\/app/);
+
+  // Settings → PDF: pick Heritage, serif title, a gold accent; save.
+  await page.goto("/app/settings");
+  await page.waitForLoadState("load");
+  await page.waitForTimeout(1500); // hydration
+  await page.getByRole("radio", { name: /Heritage/ }).click();
+  await page.getByRole("radio", { name: "Fraunces serif" }).click();
+  await page.getByLabel("Accent colour").fill("#C9A227");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  // Saving re-renders the form from the server; nothing left to save means it landed.
+  await expect(page.getByRole("button", { name: "Save changes" })).toBeDisabled({
+    timeout: 15_000,
+  });
+  await page.reload();
+  await expect(page.getByRole("radio", { name: /Heritage/ })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+  await expect(page.getByRole("radio", { name: "Fraunces serif" })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+
+  // Download the PDF from the share panel: cover + 2 days + last page, numbers stamped.
+  await page.goto(`/app/i/${it.id}`);
+  await page.waitForLoadState("load");
+  await page.waitForTimeout(1500);
+  await page.getByRole("button", { name: "Share", exact: true }).click();
+  const panel = page.getByRole("dialog", { name: "Share itinerary" });
+  const download = page.waitForEvent("download", { timeout: 90_000 });
+  await panel.getByRole("button", { name: "Download PDF" }).click();
+  const file = await download;
+  const bytes = await new Promise<Buffer>((resolve, reject) => {
+    void file.createReadStream().then((s) => {
+      const chunks: Buffer[] = [];
+      s.on("data", (c: Buffer) => chunks.push(c));
+      s.on("end", () => resolve(Buffer.concat(chunks)));
+      s.on("error", reject);
+    });
+  });
+  expect(bytes.subarray(0, 5).toString()).toBe("%PDF-");
+  const { PDFDocument } = await import("pdf-lib");
+  const doc = await PDFDocument.load(bytes);
+  expect(doc.getPageCount()).toBe(4);
+  // The client page itself is unchanged by the style.
+  const client = await page.context().newPage();
+  await client.goto(`/s/${it.token}`);
+  await expect(client.locator("[data-day]")).toHaveCount(2);
+  await expect(client.locator("body")).not.toContainText("Private travel itinerary");
+  await client.close();
 });
