@@ -22,7 +22,8 @@ Replaces the per-tenant stationery idea (artwork upload + zones). That approach 
 - **Golden renders**: 4 styles × {2, 5, 12 days} × {priced, hidden} = 24 PDFs from the sample fixture: no blank pages, every day present, terms and caption lines present, no price text in hidden PDFs, 0.23–0.81 MB, 1.1–12.7 s (dev server; most under 4 s). 5-day priced PDFs saved in `docs/design/actual/pdf/`. Pages: 2 days → 4, 5 days → 7, 12 days → 14 (Editorial 15: its cover's "Where you stay" list of 11 nights takes two pages, same as before styles)
 - **Edge cases**: 60-character title and 60-character agency name in every style → 7 pages each after the long-name fixes; missing photos (the fixture has none) → photo grounds with place names
 - **Editorial regression**: four itineraries (7-day Turkey with real photos; 12, 2 and 5-day mocks) printed by `main` and by this branch: same page counts, identical extracted text, sizes within 0.03%
-- **SKTW check**: SKTW tokens (primary `#134753` sampled from the reference, gold accent, Fraunces title, Heritage), 7-day Turkey generated with real AI + Places (hotels 6/6 verified, AI eyebrow "A winter journey through"), Akil Shaikh, 4 adults, ₹54,567: 9 pages (cover, one page per day, Price and terms), 3.1 MB, 7.7 s warm. Cover side by side with `cover-reference.png` on the GitHub issue (full PDF not posted: Google photos, public repo). Not done with the real backdrop: see Blocked
+- **SKTW check**: SKTW tokens (primary `#134753` sampled from the reference, gold accent, Fraunces title, Heritage), 7-day Turkey generated with real AI + Places (hotels 6/6 verified, AI eyebrow "A winter journey through"), Akil Shaikh, 4 adults, ₹54,567: 9 pages (cover, one page per day, Price and terms), 3.1 MB, 7.7 s warm. Cover side by side with `cover-reference.png`: `docs/design/actual/pdf/sktw-heritage-cover-vs-reference.png` and on the GitHub issue (full PDF not posted: Google photos, public repo). Not done with the real backdrop: see Blocked
+- **Live** (deployed `a028b92`, CI & Deploy run 43911355162 green): `/api/health` ok; **E2E (live)** [run 43913584292](https://github.com/ayazsayyed/Daywise/actions/runs/43913584292) **7/7 passed**, including the new Heritage PDF test through the production worker (migration `0007` applied: the throwaway tenant saved a style, accent and title font)
 - **e2e**: `share.spec.ts` gained "PDF style switch → a Heritage PDF renders through the worker" (settings save, real download, 4 pages, client page unchanged). Locally 7/7 pass warm; on cold dev compiles `share` (generate) and `admin › create tenant, open as it` each failed once and passed on rerun (timing, not assertions)
 
 ## Done (Day 5, 12 Nov 2026)
@@ -55,6 +56,11 @@ Live = https://daywise.smallsoftware.in, checked through Actions (this sandbox c
 - [x] **Backup file appears in R2 and restores.** `backups/daywise-20261112T1753Z.dump` (84,726 bytes) uploaded; restored into a scratch database on the server and counted. "Restores locally" was done on the server, not on a laptop: this sandbox holds no R2 keys. Laptop steps are in the README
 - [x] **`pnpm check` + e2e green.** `pnpm check` 174 tests in CI; e2e 6/6 locally (dev and production build) and **6/6 against the live site** (real AI for the generate step), `e2e-*` tenants cleaned up (0 left)
 - Sentry: production test events accepted (ids above). Confirm they are visible in Sentry: search `alert:ops_sentry_test` and `alert:places-budget:places_search`
+
+## How to test PDF styles (live)
+1. Sign in at https://daywise.smallsoftware.in → Settings → **PDF**: pick a style, accent, title font (and a backdrop for Heritage); watch the preview; **Save changes**; **Preview PDF**
+2. Open any itinerary: the line above the title is the cover eyebrow (editable). Share → **Cover photos** to choose two; **Download PDF**
+3. `/admin/t/<id>` → PDF style (bespoke ids appear only for the agency that owns them)
 
 ## How to test Day 5 (live)
 1. Sign in at https://daywise.smallsoftware.in/login as the superadmin → `/admin`
